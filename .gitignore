@@ -1,0 +1,36 @@
+# Entorno virtual
+.venv/
+venv/
+env/
+
+# Archivos de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+`
+# Archivos de configuración local
+.env
+config.local.py
+
+# Archivos temporales
+*.tmp
+*.temp
+*.log
+
+# Datos sensibles
+*.xlsx
+*.csv
+!divipola.csv
+
+# Data directory (but keep GeoJSON)
+data/*
+!data/colombia.geo.json

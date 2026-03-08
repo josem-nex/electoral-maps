@@ -1,0 +1,1 @@
+# Backend electoral maps application
