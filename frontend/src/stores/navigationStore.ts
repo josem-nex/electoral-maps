@@ -19,10 +19,12 @@ interface NavigationStore {
   currentLayer: ElectoralLayer;
   currentJurisdiccion: Jurisdiccion | null;
   navigationStack: Jurisdiccion[];
+  selectedMunicipioCode: string | null;
 
   navigateTo: (jurisdiccion: Jurisdiccion) => void;
   navigateBack: () => void;
   navigateToIndex: (index: number) => void;
+  setSelectedMunicipioCode: (code: string | null) => void;
   reset: () => void;
 }
 
@@ -40,6 +42,7 @@ export const useNavigationStore = create<NavigationStore>((set) => ({
   currentLayer: 'pais',
   currentJurisdiccion: initialJurisdiccion,
   navigationStack: [initialJurisdiccion],
+  selectedMunicipioCode: null,
 
   navigateTo: (jurisdiccion) => set((state) => {
     const current = state.currentJurisdiccion;
@@ -55,6 +58,8 @@ export const useNavigationStore = create<NavigationStore>((set) => ({
         currentLayer: jurisdiccion.layer,
         currentJurisdiccion: jurisdiccion,
         navigationStack: updatedStack,
+        // Clear so SearchBar's setSelectedMunicipioCode always triggers a fresh change
+        selectedMunicipioCode: null,
       };
     }
 
@@ -62,6 +67,10 @@ export const useNavigationStore = create<NavigationStore>((set) => ({
       currentLayer: jurisdiccion.layer,
       currentJurisdiccion: jurisdiccion,
       navigationStack: [...state.navigationStack, jurisdiccion],
+      selectedMunicipioCode:
+        jurisdiccion.layer === 'departamentos'
+          ? state.selectedMunicipioCode
+          : null,
     };
   }),
 
@@ -73,6 +82,10 @@ export const useNavigationStore = create<NavigationStore>((set) => ({
       navigationStack: newStack,
       currentLayer: previous.layer,
       currentJurisdiccion: previous,
+      selectedMunicipioCode:
+        previous.layer === 'departamentos'
+          ? state.selectedMunicipioCode
+          : null,
     };
   }),
 
@@ -84,12 +97,19 @@ export const useNavigationStore = create<NavigationStore>((set) => ({
       navigationStack: newStack,
       currentLayer: target.layer,
       currentJurisdiccion: target,
+      selectedMunicipioCode:
+        target.layer === 'departamentos'
+          ? state.selectedMunicipioCode
+          : null,
     };
   }),
+
+  setSelectedMunicipioCode: (code) => set({ selectedMunicipioCode: code }),
 
   reset: () => set({
     currentLayer: 'pais',
     currentJurisdiccion: initialJurisdiccion,
     navigationStack: [initialJurisdiccion],
+    selectedMunicipioCode: null,
   }),
 }));

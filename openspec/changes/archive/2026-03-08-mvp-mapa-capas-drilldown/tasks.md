@@ -24,6 +24,6 @@
 
 ## 5. Verificación MVP de navegación
 
-- [ ] 5.1 Probar flujo País → Zonas → Departamentos → Municipio → Puesto
-- [ ] 5.2 Probar retorno por breadcrumbs en cada nivel
+- [x] 5.1 Probar flujo País → Departamentos → Municipio → Puesto
+- [x] 5.2 Probar retorno por breadcrumbs en cada nivel
 - [x] 5.3 Documentar supuestos de Localidad/UPZ y Consulados en README técnico

@@ -31,6 +31,7 @@ export interface SearchResult {
   name: string;
   code: string;
   parent_code?: string;
+  parent_name?: string;
   direccion?: string;
   center_lat: number;
   center_lon: number;

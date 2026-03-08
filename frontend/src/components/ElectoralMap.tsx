@@ -30,7 +30,9 @@ interface MapControllerProps {
   center: [number, number];
   zoom: number;
   selectedDepartmentCode: string | null;
+  selectedMunicipioCode: string | null;
   departmentGeoJSON: any;
+  municipiosGeoJSON: any;
   isInDepartmentView: boolean;
 }
 
@@ -50,19 +52,55 @@ function normalizeDepartmentCode(value?: string): string | null {
   return digits.padStart(2, "0").slice(-2);
 }
 
+function normalizeMunicipioCode(value?: string): string | null {
+  if (!value) {
+    return null;
+  }
+  const digits = value.replace(/\D/g, "");
+  if (!digits) {
+    return null;
+  }
+  return digits.padStart(5, "0").slice(-5);
+}
+
+function municipioCodeFromFeature(feature: any): string | null {
+  const props = feature?.properties ?? {};
+
+  const fullCode =
+    props.MPIO_CDPMP ?? props.CODIGO_DANE ?? props.COD_DANE ?? props.MPIO;
+  const normalizedFullCode = normalizeMunicipioCode(String(fullCode ?? ""));
+  if (normalizedFullCode) {
+    return normalizedFullCode;
+  }
+
+  const deptCode = normalizeDepartmentCode(
+    String(props.DPTO_CCDGO ?? props.DPTO ?? ""),
+  );
+  const munDigits = String(props.MPIO_CCDGO ?? "").replace(/\D/g, "");
+  if (deptCode && munDigits) {
+    return `${deptCode}${munDigits.padStart(3, "0").slice(-3)}`;
+  }
+
+  return null;
+}
+
 function MapController({
   center,
   zoom,
   selectedDepartmentCode,
+  selectedMunicipioCode,
   departmentGeoJSON,
+  municipiosGeoJSON,
   isInDepartmentView,
 }: MapControllerProps & { isInDepartmentView: boolean }) {
   const map = useMap();
-  const [lastZoomedDept, setLastZoomedDept] = useState<string | null>(null);
 
   useEffect(() => {
+    // Skip setView when a dept or municipality is selected — fitBounds handles
+    // positioning in those cases, and having both animate causes conflicts.
+    if (selectedMunicipioCode || selectedDepartmentCode) return;
     map.setView(center, zoom);
-  }, [center, zoom, map]);
+  }, [center, zoom, selectedMunicipioCode, selectedDepartmentCode, map]);
 
   // Handle maxBounds based on view mode
   useEffect(() => {
@@ -82,13 +120,7 @@ function MapController({
 
   // Handle automatic zoom when department is selected
   useEffect(() => {
-    if (
-      !selectedDepartmentCode ||
-      !departmentGeoJSON ||
-      selectedDepartmentCode === lastZoomedDept
-    ) {
-      return;
-    }
+    if (!selectedDepartmentCode || !departmentGeoJSON) return;
 
     const departmentFeature = departmentGeoJSON.features?.find(
       (feature: any) =>
@@ -99,20 +131,60 @@ function MapController({
     if (departmentFeature) {
       const geoJsonLayer = L.geoJSON(departmentFeature);
       const bounds = geoJsonLayer.getBounds();
-
       if (bounds.isValid()) {
-        // Just use fitBounds without restrictions
-        map.fitBounds(bounds, { padding: [50, 50] });
-        setLastZoomedDept(selectedDepartmentCode);
+        // Temporarily lift maxBounds so fitBounds is never clipped for
+        // departments near Colombia's borders (e.g. Amazonas, Nariño, Guajira).
+        map.setMaxBounds(null as any);
+        map.fitBounds(bounds, { padding: [20, 20], maxZoom: 9 });
+        // Restore generous padding once the animation settles (~350 ms).
+        const colombiaBounds = L.latLngBounds(
+          COLOMBIA_BOUNDS[0] as [number, number],
+          COLOMBIA_BOUNDS[1] as [number, number],
+        );
+        setTimeout(() => {
+          map.setMaxBounds(colombiaBounds.pad(1.5));
+        }, 400);
       }
     }
-  }, [selectedDepartmentCode, departmentGeoJSON, map, lastZoomedDept]);
+  }, [selectedDepartmentCode, departmentGeoJSON, map]);
+
+  // Handle automatic zoom when municipality is selected from search
+  useEffect(() => {
+    if (!selectedMunicipioCode || !municipiosGeoJSON) return;
+
+    const municipioFeature = municipiosGeoJSON.features?.find(
+      (feature: any) =>
+        municipioCodeFromFeature(feature) === selectedMunicipioCode,
+    );
+
+    if (municipioFeature) {
+      const geoJsonLayer = L.geoJSON(municipioFeature);
+      const bounds = geoJsonLayer.getBounds();
+      if (bounds.isValid()) {
+        // Same border-clipping fix as for departments.
+        map.setMaxBounds(null as any);
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 10 });
+        const colombiaBounds = L.latLngBounds(
+          COLOMBIA_BOUNDS[0] as [number, number],
+          COLOMBIA_BOUNDS[1] as [number, number],
+        );
+        setTimeout(() => {
+          map.setMaxBounds(colombiaBounds.pad(1.5));
+        }, 400);
+      }
+    }
+  }, [selectedMunicipioCode, municipiosGeoJSON, map]);
 
   return null;
 }
 
 export function ElectoralMap() {
-  const { currentJurisdiccion, navigateTo } = useNavigationStore();
+  const {
+    currentJurisdiccion,
+    navigateTo,
+    selectedMunicipioCode,
+    setSelectedMunicipioCode,
+  } = useNavigationStore();
   const [departamentosGeoJSON, setDepartamentosGeoJSON] = useState<any>(null);
   const [municipiosGeoJSON, setMunicipiosGeoJSON] = useState<any>(null);
   const [departamentos, setDepartamentos] = useState<Jurisdiccion[]>([]);
@@ -198,6 +270,10 @@ export function ElectoralMap() {
           setPuestos([]);
         } else if (currentJurisdiccion.layer === "departamentos") {
           if (selectedDepartmentCode) {
+            // Clear first so the GeoJSON layer unmounts and remounts with the
+            // new data, ensuring the selected-municipality style is applied
+            // correctly even when switching between departments.
+            setMunicipiosGeoJSON(null);
             const municipiosData = await api.getMunicipiosGeoJSON(
               selectedDepartmentCode,
             );
@@ -248,7 +324,15 @@ export function ElectoralMap() {
     };
 
     loadData();
-  }, [currentJurisdiccion, selectedDepartmentCode]);
+    // Use primitive/stable values as deps to avoid re-fetching when navigateTo
+    // replaces the currentJurisdiccion reference but the underlying data hasn't
+    // changed (e.g. same department, different selected municipality).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    currentJurisdiccion?.id,
+    currentJurisdiccion?.layer,
+    selectedDepartmentCode,
+  ]);
 
   const handleDepartmentClick = (feature: any) => {
     const deptCode = String(feature.properties.DPTO).padStart(2, "0");
@@ -264,11 +348,13 @@ export function ElectoralMap() {
     // Find this department in the loaded data
     const dept = departamentos.find((d) => d.code === deptCode);
     if (dept) {
+      setSelectedMunicipioCode(null);
       navigateTo(dept);
     } else {
       // Create jurisdiction on the fly
       const bounds = (L.geoJSON(feature) as any).getBounds();
       const center = bounds.getCenter();
+      setSelectedMunicipioCode(null);
       navigateTo({
         id: `dept:${deptCode}`,
         layer: "departamentos",
@@ -348,14 +434,63 @@ export function ElectoralMap() {
         className: "municipality-tooltip",
       });
     }
+
+    layer.on({
+      mouseover: (e: any) => {
+        const featureCode = municipioCodeFromFeature(feature);
+        const isSelected =
+          selectedMunicipioCode && featureCode === selectedMunicipioCode;
+        if (!isSelected) {
+          e.target.setStyle({ fillOpacity: 0.14, weight: 1.4 });
+        }
+      },
+      mouseout: (e: any) => {
+        const featureCode = municipioCodeFromFeature(feature);
+        const isSelected =
+          selectedMunicipioCode && featureCode === selectedMunicipioCode;
+        if (isSelected) {
+          e.target.setStyle({
+            color: "#b45309",
+            weight: 2.2,
+            opacity: 0.95,
+            fillColor: "#f59e0b",
+            fillOpacity: 0.2,
+          });
+        } else {
+          e.target.setStyle({
+            color: "#0f172a",
+            weight: 1,
+            opacity: 0.85,
+            fillColor: "#cbd5e1",
+            fillOpacity: 0.03,
+          });
+        }
+      },
+    });
   };
 
-  const municipioStyle: L.PathOptions = {
-    color: "#0f172a",
-    weight: 1,
-    opacity: 0.85,
-    fillColor: "#cbd5e1",
-    fillOpacity: 0.03,
+  const municipioStyle = (feature: any): L.PathOptions => {
+    const featureCode = municipioCodeFromFeature(feature);
+    const isSelected =
+      selectedMunicipioCode && featureCode === selectedMunicipioCode;
+
+    if (isSelected) {
+      return {
+        color: "#b45309",
+        weight: 2.2,
+        opacity: 0.95,
+        fillColor: "#f59e0b",
+        fillOpacity: 0.2,
+      };
+    }
+
+    return {
+      color: "#0f172a",
+      weight: 1,
+      opacity: 0.85,
+      fillColor: "#cbd5e1",
+      fillOpacity: 0.03,
+    };
   };
 
   return (
@@ -379,7 +514,9 @@ export function ElectoralMap() {
           center={center}
           zoom={zoom}
           selectedDepartmentCode={selectedDepartmentCode}
+          selectedMunicipioCode={selectedMunicipioCode}
           departmentGeoJSON={departamentosGeoJSON}
+          municipiosGeoJSON={municipiosGeoJSON}
           isInDepartmentView={currentJurisdiccion?.layer === "departamentos"}
         />
 
@@ -404,6 +541,7 @@ export function ElectoralMap() {
         {currentJurisdiccion?.layer === "departamentos" &&
           municipiosGeoJSON && (
             <GeoJSON
+              key={`${selectedDepartmentCode ?? "none"}-${selectedMunicipioCode ?? "none"}`}
               data={municipiosGeoJSON}
               style={municipioStyle}
               interactive={true}

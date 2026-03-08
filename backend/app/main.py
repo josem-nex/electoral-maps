@@ -165,17 +165,22 @@ def get_puestos(
 
 @app.get("/api/v1/search", response_model=List[SearchResult])
 def search(
-    q: str = Query(..., min_length=2),
+    q: str = Query(..., min_length=1),
     limit: int = Query(20, le=50),
 ):
-    """Search jurisdictions and puestos."""
+    """Search jurisdictions by prefix (departments and municipalities)."""
     q_norm = normalize_text(q)
     results = []
+
+    if not q_norm:
+        return []
     
     # Search departments
     _, departamentos = build_departamentos_catalog()
+    dept_by_code = {dept.code: dept.name for dept in departamentos}
     for dept in departamentos:
-        if q_norm in normalize_text(dept.name):
+        dept_name_norm = normalize_text(dept.name)
+        if dept_name_norm.startswith(q_norm) or dept.code.startswith(q_norm):
             results.append(
                 SearchResult(
                     id=dept.id,
@@ -191,7 +196,8 @@ def search(
     # Search municipalities
     municipios = build_municipios_catalog()
     for mun in municipios:
-        if q_norm in normalize_text(mun.name):
+        mun_name_norm = normalize_text(mun.name)
+        if mun_name_norm.startswith(q_norm) or mun.code.startswith(q_norm):
             results.append(
                 SearchResult(
                     id=mun.id,
@@ -199,27 +205,10 @@ def search(
                     name=mun.name,
                     code=mun.code,
                     parent_code=mun.parent_code,
+                    parent_name=dept_by_code.get(mun.parent_code or ""),
                     center_lat=mun.center_lat,
                     center_lon=mun.center_lon,
                     zoom=mun.zoom,
-                )
-            )
-    
-    # Search puestos
-    puestos = get_puestos_by_filters(limit=500)
-    for puesto in puestos:
-        if q_norm in normalize_text(puesto.puesto) or q_norm in puesto.codigo_puesto:
-            results.append(
-                SearchResult(
-                    id=f"puesto:{puesto.codigo_puesto}",
-                    type="puesto",
-                    name=puesto.puesto,
-                    code=puesto.codigo_puesto,
-                    parent_code=puesto.municipio_codigo,
-                    direccion=puesto.direccion,
-                    center_lat=puesto.latitud,
-                    center_lon=puesto.longitud,
-                    zoom=13.8,
                 )
             )
     

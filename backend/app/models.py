@@ -53,9 +53,15 @@ class PuestoElectoral(BaseModel):
 class SearchResult(BaseModel):
     """Search result model."""
     id: str
-    label: str
-    layer: ElectoralLayer
-    record: Jurisdiccion
+    type: str
+    name: str
+    code: str
+    parent_code: Optional[str] = None
+    parent_name: Optional[str] = None
+    direccion: Optional[str] = None
+    center_lat: float
+    center_lon: float
+    zoom: float
     
     class Config:
         use_enum_values = True

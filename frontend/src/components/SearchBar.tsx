@@ -9,12 +9,14 @@ export function SearchBar() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
-  const { navigateTo } = useNavigationStore();
+  const { navigateTo, setSelectedMunicipioCode } = useNavigationStore();
 
   const handleSearch = async (searchQuery: string) => {
     setQuery(searchQuery);
 
-    if (searchQuery.length < 2) {
+    const normalizedQuery = searchQuery.trim();
+
+    if (normalizedQuery.length < 1) {
       setResults([]);
       setShowResults(false);
       return;
@@ -22,7 +24,7 @@ export function SearchBar() {
 
     setIsSearching(true);
     try {
-      const searchResults = await api.search(searchQuery, 20);
+      const searchResults = await api.search(normalizedQuery, 20);
       setResults(searchResults);
       setShowResults(true);
     } catch (error) {
@@ -33,27 +35,46 @@ export function SearchBar() {
     }
   };
 
-  const handleResultClick = (result: SearchResult) => {
-    // Map search result to jurisdiccion format
-    const jurisdiccion: Jurisdiccion = {
-      id: result.id,
-      layer:
-        result.type === "departamento"
-          ? "departamentos"
-          : result.type === "municipio"
-            ? "municipio"
-            : "puesto",
-      name: result.name,
-      code: result.code,
-      parent_code: result.parent_code,
-      center_lat: result.center_lat,
-      center_lon: result.center_lon,
-      zoom: result.zoom,
-    };
+  const handleResultClick = async (result: SearchResult) => {
+    try {
+      if (result.type === "municipio" && result.parent_code) {
+        const departamentos = await api.getJurisdicciones("departamentos");
+        const dept = departamentos.find((d) => d.code === result.parent_code);
 
-    navigateTo(jurisdiccion);
-    setShowResults(false);
-    setQuery("");
+        if (dept) {
+          navigateTo(dept);
+          setSelectedMunicipioCode(result.code);
+        } else {
+          const fallbackDept: Jurisdiccion = {
+            id: `dept:${result.parent_code}`,
+            layer: "departamentos",
+            name: result.parent_name || `Departamento ${result.parent_code}`,
+            code: result.parent_code,
+            center_lat: result.center_lat,
+            center_lon: result.center_lon,
+            zoom: 8,
+          };
+          navigateTo(fallbackDept);
+          setSelectedMunicipioCode(result.code);
+        }
+      } else if (result.type === "departamento") {
+        const jurisdiccion: Jurisdiccion = {
+          id: result.id,
+          layer: "departamentos",
+          name: result.name,
+          code: result.code,
+          parent_code: result.parent_code,
+          center_lat: result.center_lat,
+          center_lon: result.center_lon,
+          zoom: result.zoom,
+        };
+        navigateTo(jurisdiccion);
+        setSelectedMunicipioCode(null);
+      }
+    } finally {
+      setShowResults(false);
+      setQuery("");
+    }
   };
 
   return (
@@ -63,8 +84,8 @@ export function SearchBar() {
           type="text"
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
-          onFocus={() => setShowResults(results.length > 0)}
-          placeholder="Buscar departamento, municipio o puesto..."
+          onFocus={() => setShowResults(query.trim().length > 0)}
+          placeholder="Buscar departamento o municipio..."
           className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <svg
@@ -98,8 +119,8 @@ export function SearchBar() {
               <div className="font-medium text-gray-900">{result.name}</div>
               <div className="text-sm text-gray-500">
                 {result.type === "departamento" && "Departamento"}
-                {result.type === "municipio" && "Municipio"}
-                {result.type === "puesto" && "Puesto Electoral"}
+                {result.type === "municipio" &&
+                  `Municipio${result.parent_name ? ` • ${result.parent_name}` : ""}`}
                 {result.direccion && ` • ${result.direccion}`}
               </div>
             </button>
@@ -109,7 +130,7 @@ export function SearchBar() {
 
       {showResults &&
         results.length === 0 &&
-        query.length >= 2 &&
+        query.trim().length >= 1 &&
         !isSearching && (
           <div className="absolute z-10 w-full mt-2 bg-white border border-gray-300 rounded-lg shadow-lg p-4 text-center text-gray-500">
             No se encontraron resultados
