@@ -67,10 +67,7 @@ export const useNavigationStore = create<NavigationStore>((set) => ({
       currentLayer: jurisdiccion.layer,
       currentJurisdiccion: jurisdiccion,
       navigationStack: [...state.navigationStack, jurisdiccion],
-      selectedMunicipioCode:
-        jurisdiccion.layer === 'departamentos'
-          ? state.selectedMunicipioCode
-          : null,
+      selectedMunicipioCode: null,
     };
   }),
 
@@ -82,10 +79,7 @@ export const useNavigationStore = create<NavigationStore>((set) => ({
       navigationStack: newStack,
       currentLayer: previous.layer,
       currentJurisdiccion: previous,
-      selectedMunicipioCode:
-        previous.layer === 'departamentos'
-          ? state.selectedMunicipioCode
-          : null,
+      selectedMunicipioCode: null,
     };
   }),
 
@@ -97,10 +91,7 @@ export const useNavigationStore = create<NavigationStore>((set) => ({
       navigationStack: newStack,
       currentLayer: target.layer,
       currentJurisdiccion: target,
-      selectedMunicipioCode:
-        target.layer === 'departamentos'
-          ? state.selectedMunicipioCode
-          : null,
+      selectedMunicipioCode: null,
     };
   }),
 

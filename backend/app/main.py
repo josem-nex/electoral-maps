@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import re
+import unicodedata
+from difflib import SequenceMatcher
+from functools import lru_cache
 from typing import Any, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -230,6 +233,74 @@ def _validate_parent(nivel: str, parent_id: int | None, db: Session) -> None:
         )
 
 
+def _normalize_text(value: str | None) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip().upper()
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = re.sub(r"[^A-Z0-9 ]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _normalize_municipio_name(value: str | None) -> str:
+    if value is None:
+        return ""
+    base = re.sub(r"\([^)]*\)", " ", str(value))
+    return _normalize_text(base)
+
+
+def _municipio_names_match(expected_name: str | None, candidate_name: str | None) -> bool:
+    expected = _normalize_municipio_name(expected_name)
+    candidate = _normalize_municipio_name(candidate_name)
+
+    if not expected or not candidate:
+        return False
+    if expected == candidate:
+        return True
+
+    if expected.startswith(candidate) or candidate.startswith(expected):
+        shorter = expected if len(expected) <= len(candidate) else candidate
+        if len(shorter) >= 6:
+            return True
+
+    compact_expected = expected.replace(" ", "")
+    compact_candidate = candidate.replace(" ", "")
+    similarity = SequenceMatcher(None, compact_expected, compact_candidate).ratio()
+    return similarity >= 0.9
+
+
+@lru_cache(maxsize=1)
+def _departamento_name_by_code() -> dict[str, str]:
+    mapping: dict[str, str] = {}
+    geojson = load_departamentos_geojson()
+    for feature in geojson.get("features", []):
+        props = feature.get("properties", {})
+        code = str(props.get("DPTO", "")).strip().zfill(2)
+        name = str(props.get("NOMBRE_DPT", "")).strip()
+        if code and name:
+            mapping[code] = name
+    return mapping
+
+
+def _municipio_name_by_code(municipio_code: str) -> str | None:
+    dept_code = municipio_code[:2]
+    geojson = get_municipios_geojson_by_departamento(dept_code)
+    for feature in geojson.get("features", []):
+        props = feature.get("properties", {})
+        feature_code = str(props.get("MPIO_CDPMP", "")).strip().zfill(5)
+        if feature_code == municipio_code:
+            name = (
+                props.get("MPIO_CNMBR")
+                or props.get("NOMBRE_MPI")
+                or props.get("nombre")
+            )
+            if name:
+                return str(name).strip()
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Health
 # ---------------------------------------------------------------------------
@@ -311,6 +382,9 @@ def delete_jurisdiccion(jur_id: int, db: Session = Depends(get_db)):
 @app.get("/api/v1/puestos", response_model=PuestosPage)
 def list_puestos(
     municipio_id: Optional[int] = Query(None),
+    departamento_codigo: Optional[str] = Query(None),
+    municipio_codigo: Optional[str] = Query(None),
+    localidad_codigo: Optional[str] = Query(None),
     bbox: Optional[str] = Query(None, description="lon_min,lat_min,lon_max,lat_max"),
     zoom: Optional[int] = Query(None),
     anio: Optional[int] = Query(None),
@@ -322,6 +396,8 @@ def list_puestos(
     q = db.query(PuestoORM)
     if municipio_id is not None:
         q = q.filter(PuestoORM.jurisdiccion_id == municipio_id)
+    if localidad_codigo:
+        q = q.filter(PuestoORM.comuna == localidad_codigo.strip())
     if bbox is not None:
         try:
             lon_min, lat_min, lon_max, lat_max = (float(v) for v in bbox.split(","))
@@ -337,6 +413,73 @@ def list_puestos(
         q = q.filter(PuestoORM.anio == anio)
     if corporacion is not None:
         q = q.filter(PuestoORM.corporacion == corporacion)
+
+    if municipio_codigo:
+        normalized_municipio_code = municipio_codigo.strip().zfill(5)
+        normalized_departamento_codigo = (
+            departamento_codigo.strip().zfill(2) if departamento_codigo else None
+        )
+
+        if (
+            normalized_departamento_codigo
+            and normalized_departamento_codigo != normalized_municipio_code[:2]
+        ):
+            effective_limit = min(limit, LIMIT_CAP)
+            return PuestosPage(total=0, limit=effective_limit, items=[])
+
+        municipio_name = _municipio_name_by_code(normalized_municipio_code)
+        departamento_name = _departamento_name_by_code().get(normalized_municipio_code[:2])
+        municipio_norm = _normalize_text(municipio_name)
+        departamento_norm = _normalize_text(departamento_name)
+
+        q_municipio = q.filter(PuestoORM.municipio_codigo == normalized_municipio_code)
+
+        exact_rows = q_municipio.all()
+        if exact_rows:
+            if municipio_norm:
+                exact_matching_rows = []
+                for row in exact_rows:
+                    if not _municipio_names_match(municipio_name, row.municipio):
+                        continue
+                    if departamento_norm and _normalize_text(row.departamento) != departamento_norm:
+                        continue
+                    exact_matching_rows.append(row)
+
+                if exact_matching_rows:
+                    effective_limit = min(limit, LIMIT_CAP)
+                    return PuestosPage(
+                        total=len(exact_matching_rows),
+                        limit=effective_limit,
+                        items=exact_matching_rows[:effective_limit],
+                    )
+            else:
+                q = q_municipio
+                effective_limit = min(limit, LIMIT_CAP)
+                total = q.count()
+                items = q.limit(effective_limit).all()
+                return PuestosPage(total=total, limit=effective_limit, items=items)
+
+        if municipio_name:
+            fallback_rows = []
+            for row in q.all():
+                if not _municipio_names_match(municipio_name, row.municipio):
+                    continue
+                if departamento_norm and _normalize_text(row.departamento) != departamento_norm:
+                    continue
+                fallback_rows.append(row)
+
+            effective_limit = min(limit, LIMIT_CAP)
+            return PuestosPage(
+                total=len(fallback_rows),
+                limit=effective_limit,
+                items=fallback_rows[:effective_limit],
+            )
+
+        effective_limit = min(limit, LIMIT_CAP)
+        return PuestosPage(total=0, limit=effective_limit, items=[])
+
+    if departamento_codigo:
+        q = q.filter(PuestoORM.departamento_codigo == departamento_codigo.strip().zfill(2))
 
     effective_limit = min(limit, LIMIT_CAP)
     total = q.count()

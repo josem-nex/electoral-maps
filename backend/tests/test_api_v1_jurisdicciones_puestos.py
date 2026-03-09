@@ -201,6 +201,249 @@ def test_puestos_filtros_bbox_zoom_anio_corporacion(client: TestClient) -> None:
     assert payload["items"][0]["codigo_puesto"] == "P05001A"
 
 
+def test_puestos_filtra_por_municipio_codigo(client: TestClient) -> None:
+    hierarchy = _create_hierarchy(client)
+
+    p1_resp = client.post(
+        "/api/v1/puestos",
+        json={
+            "codigo_puesto": "P05001M",
+            "jurisdiccion_id": hierarchy["mun"],
+            "departamento_codigo": "05",
+            "municipio_codigo": "05001",
+            "departamento": "Antioquia",
+            "municipio": "Medellín",
+            "puesto": "IE Centro",
+            "latitud": 6.24,
+            "longitud": -75.58,
+            "anio": 2022,
+            "corporacion": "senado",
+        },
+    )
+    assert p1_resp.status_code == 201
+
+    p2_resp = client.post(
+        "/api/v1/puestos",
+        json={
+            "codigo_puesto": "P76001C",
+            "jurisdiccion_id": hierarchy["mun"],
+            "departamento_codigo": "76",
+            "municipio_codigo": "76001",
+            "departamento": "Valle del Cauca",
+            "municipio": "Cali",
+            "puesto": "IE Sur",
+            "latitud": 3.45,
+            "longitud": -76.53,
+            "anio": 2022,
+            "corporacion": "senado",
+        },
+    )
+    assert p2_resp.status_code == 201
+
+    list_resp = client.get(
+        "/api/v1/puestos",
+        params={
+            "municipio_codigo": "76001",
+            "limit": 500,
+        },
+    )
+    assert list_resp.status_code == 200
+
+    payload = list_resp.json()
+    assert payload["total"] == 1
+    assert payload["items"][0]["codigo_puesto"] == "P76001C"
+
+
+def test_puestos_fallback_por_nombre_si_codigo_municipio_inconsistente(client: TestClient) -> None:
+    hierarchy = _create_hierarchy(client)
+
+    create_resp = client.post(
+        "/api/v1/puestos",
+        json={
+            "codigo_puesto": "P-MED-LEGACY",
+            "jurisdiccion_id": hierarchy["mun"],
+            "departamento_codigo": "05",
+            "municipio_codigo": "01001",  # código legado/erróneo en datos cargados
+            "departamento": "ANTIOQUIA",
+            "municipio": "MEDELLIN",
+            "puesto": "IE Centro",
+            "latitud": 6.24,
+            "longitud": -75.58,
+            "anio": 2022,
+            "corporacion": "senado",
+        },
+    )
+    assert create_resp.status_code == 201
+
+    list_resp = client.get(
+        "/api/v1/puestos",
+        params={
+            "municipio_codigo": "05001",  # código correcto solicitado desde mapa
+            "limit": 500,
+        },
+    )
+    assert list_resp.status_code == 200
+
+    payload = list_resp.json()
+    assert payload["total"] == 1
+    assert payload["items"][0]["codigo_puesto"] == "P-MED-LEGACY"
+
+
+def test_puestos_ignora_codigo_conflictivo_y_prioriza_municipio_correcto(client: TestClient) -> None:
+    hierarchy = _create_hierarchy(client)
+
+    wrong_code_resp = client.post(
+        "/api/v1/puestos",
+        json={
+            "codigo_puesto": "P-CONFLICT-WRONG",
+            "jurisdiccion_id": hierarchy["mun"],
+            "departamento_codigo": "13",
+            "municipio_codigo": "05031",  # código solicitado por Amalfi, pero aquí mal cargado
+            "departamento": "BOLIVAR",
+            "municipio": "MAHATES",
+            "puesto": "IE Erroneo",
+            "latitud": 10.2,
+            "longitud": -75.2,
+            "anio": 2022,
+            "corporacion": "senado",
+        },
+    )
+    assert wrong_code_resp.status_code == 201
+
+    right_name_resp = client.post(
+        "/api/v1/puestos",
+        json={
+            "codigo_puesto": "P-CONFLICT-RIGHT",
+            "jurisdiccion_id": hierarchy["mun"],
+            "departamento_codigo": "05",
+            "municipio_codigo": "01016",  # código legado/erróneo de Amalfi en la data
+            "departamento": "ANTIOQUIA",
+            "municipio": "AMALFI",
+            "puesto": "IE Correcto",
+            "latitud": 6.9,
+            "longitud": -75.0,
+            "anio": 2022,
+            "corporacion": "senado",
+        },
+    )
+    assert right_name_resp.status_code == 201
+
+    list_resp = client.get(
+        "/api/v1/puestos",
+        params={
+            "municipio_codigo": "05031",  # Amalfi en catálogo geográfico
+            "limit": 500,
+        },
+    )
+    assert list_resp.status_code == 200
+
+    payload = list_resp.json()
+    assert payload["total"] == 1
+    assert payload["items"][0]["codigo_puesto"] == "P-CONFLICT-RIGHT"
+
+
+def test_puestos_fallback_funciona_con_departamento_codigo_en_query(client: TestClient) -> None:
+    hierarchy = _create_hierarchy(client)
+
+    create_resp = client.post(
+        "/api/v1/puestos",
+        json={
+            "codigo_puesto": "P-AMALFI-LEGACY",
+            "jurisdiccion_id": hierarchy["mun"],
+            "departamento_codigo": "01",  # código legado incorrecto
+            "municipio_codigo": "01016",  # código legado incorrecto
+            "departamento": "ANTIOQUIA",
+            "municipio": "AMALFI",
+            "puesto": "IE Amalfi",
+            "latitud": 6.9,
+            "longitud": -75.0,
+            "anio": 2022,
+            "corporacion": "senado",
+        },
+    )
+    assert create_resp.status_code == 201
+
+    list_resp = client.get(
+        "/api/v1/puestos",
+        params={
+            "departamento_codigo": "05",  # enviado por frontend
+            "municipio_codigo": "05031",  # Amalfi catálogo
+            "limit": 500,
+        },
+    )
+    assert list_resp.status_code == 200
+
+    payload = list_resp.json()
+    assert payload["total"] == 1
+    assert payload["items"][0]["codigo_puesto"] == "P-AMALFI-LEGACY"
+
+
+def test_puestos_match_nombre_con_parentesis_y_variante_ortografica(client: TestClient) -> None:
+    hierarchy = _create_hierarchy(client)
+
+    san_miguel_resp = client.post(
+        "/api/v1/puestos",
+        json={
+            "codigo_puesto": "P-PUT-SANMIGUEL",
+            "jurisdiccion_id": hierarchy["mun"],
+            "departamento_codigo": "64",
+            "municipio_codigo": "64018",  # legacy inconsistente
+            "departamento": "PUTUMAYO",
+            "municipio": "SAN MIGUEL (LA DORADA)",
+            "puesto": "IE San Miguel",
+            "latitud": 0.34,
+            "longitud": -76.92,
+            "anio": 2022,
+            "corporacion": "senado",
+        },
+    )
+    assert san_miguel_resp.status_code == 201
+
+    guamuez_resp = client.post(
+        "/api/v1/puestos",
+        json={
+            "codigo_puesto": "P-PUT-GUAMUEZ",
+            "jurisdiccion_id": hierarchy["mun"],
+            "departamento_codigo": "64",
+            "municipio_codigo": "64028",  # legacy inconsistente
+            "departamento": "PUTUMAYO",
+            "municipio": "VALLE DEL GUAMUEZ (LA HORMIGA)",
+            "puesto": "IE Guamuez",
+            "latitud": 0.37,
+            "longitud": -76.91,
+            "anio": 2022,
+            "corporacion": "senado",
+        },
+    )
+    assert guamuez_resp.status_code == 201
+
+    san_miguel_query = client.get(
+        "/api/v1/puestos",
+        params={
+            "departamento_codigo": "86",  # Putumayo en catálogo del mapa
+            "municipio_codigo": "86757",  # SAN MIGUEL en mapa
+            "limit": 500,
+        },
+    )
+    assert san_miguel_query.status_code == 200
+    san_miguel_payload = san_miguel_query.json()
+    assert san_miguel_payload["total"] == 1
+    assert san_miguel_payload["items"][0]["codigo_puesto"] == "P-PUT-SANMIGUEL"
+
+    guamez_query = client.get(
+        "/api/v1/puestos",
+        params={
+            "departamento_codigo": "86",  # Putumayo
+            "municipio_codigo": "86865",  # VALLE DEL GUAMUEZ en mapa
+            "limit": 500,
+        },
+    )
+    assert guamez_query.status_code == 200
+    guamez_payload = guamez_query.json()
+    assert guamez_payload["total"] == 1
+    assert guamez_payload["items"][0]["codigo_puesto"] == "P-PUT-GUAMUEZ"
+
+
 def test_search_persona_y_analytics(client: TestClient) -> None:
     hierarchy = _create_hierarchy(client)
 

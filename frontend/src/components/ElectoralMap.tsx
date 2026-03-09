@@ -322,6 +322,7 @@ export function ElectoralMap() {
             const parts = currentJurisdiccion.id.split(":");
             const munCode = parts[1];
             const puestosData = await api.getPuestos({
+              departamento_codigo: munCode.slice(0, 2),
               municipio_codigo: munCode,
               limit: 2500,
             });
@@ -377,10 +378,18 @@ export function ElectoralMap() {
     }
     setSelectedPuesto(null);
     api
-      .getPuestos({ municipio_codigo: selectedMunicipioCode, limit: 2500 })
+      .getPuestos({
+        departamento_codigo: selectedDepartmentCode ?? undefined,
+        municipio_codigo: selectedMunicipioCode,
+        limit: 2500,
+      })
       .then(setPuestos)
       .catch(console.error);
-  }, [selectedMunicipioCode, currentJurisdiccion?.layer]);
+  }, [
+    selectedMunicipioCode,
+    selectedDepartmentCode,
+    currentJurisdiccion?.layer,
+  ]);
 
   const handleDepartmentClick = (feature: any) => {
     const deptCode = String(feature.properties.DPTO).padStart(2, "0");
