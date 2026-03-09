@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -13,6 +13,7 @@ import { useNavigationStore } from "../stores/navigationStore";
 import { api } from "../api/client";
 import type { PuestoElectoral } from "../api/client";
 import type { Jurisdiccion } from "../stores/navigationStore";
+import { PuestoDetailPanel } from "./PuestoDetailPanel";
 
 // Fix for default marker icons in webpack
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -40,6 +41,10 @@ const COLOMBIA_BOUNDS: [[number, number], [number, number]] = [
   [-4.4, -81.85],
   [13.6, -66.7],
 ];
+
+function isLikelyColombiaCenter(lat: number, lng: number): boolean {
+  return lat >= -6 && lat <= 15 && lng >= -83 && lng <= -65;
+}
 
 function normalizeDepartmentCode(value?: string): string | null {
   if (!value) {
@@ -132,6 +137,10 @@ function MapController({
       const geoJsonLayer = L.geoJSON(departmentFeature);
       const bounds = geoJsonLayer.getBounds();
       if (bounds.isValid()) {
+        const center = bounds.getCenter();
+        if (!isLikelyColombiaCenter(center.lat, center.lng)) {
+          return;
+        }
         // Temporarily lift maxBounds so fitBounds is never clipped for
         // departments near Colombia's borders (e.g. Amazonas, Nariño, Guajira).
         map.setMaxBounds(null as any);
@@ -161,6 +170,10 @@ function MapController({
       const geoJsonLayer = L.geoJSON(municipioFeature);
       const bounds = geoJsonLayer.getBounds();
       if (bounds.isValid()) {
+        const center = bounds.getCenter();
+        if (!isLikelyColombiaCenter(center.lat, center.lng)) {
+          return;
+        }
         // Same border-clipping fix as for departments.
         map.setMaxBounds(null as any);
         map.fitBounds(bounds, { padding: [60, 60], maxZoom: 10 });
@@ -189,7 +202,19 @@ export function ElectoralMap() {
   const [municipiosGeoJSON, setMunicipiosGeoJSON] = useState<any>(null);
   const [departamentos, setDepartamentos] = useState<Jurisdiccion[]>([]);
   const [puestos, setPuestos] = useState<PuestoElectoral[]>([]);
+  const [selectedPuesto, setSelectedPuesto] = useState<PuestoElectoral | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
+
+  // Ref to keep selectedMunicipioCode accessible in stale Leaflet closures
+  const selectedMunicipioCodeRef = useRef<string | null>(selectedMunicipioCode);
+  useEffect(() => {
+    selectedMunicipioCodeRef.current = selectedMunicipioCode;
+  }, [selectedMunicipioCode]);
+
+  // Ref to the Leaflet GeoJSON layer so we can update styles without remounting
+  const municipiosLayerRef = useRef<L.GeoJSON | null>(null);
 
   const center: [number, number] = currentJurisdiccion
     ? [currentJurisdiccion.center_lat, currentJurisdiccion.center_lon]
@@ -334,6 +359,29 @@ export function ElectoralMap() {
     selectedDepartmentCode,
   ]);
 
+  // Update municipality styles imperatively when selection changes (avoids remounting)
+  useEffect(() => {
+    const layer = municipiosLayerRef.current as any;
+    if (!layer || typeof layer.setStyle !== "function") return;
+    layer.setStyle((feature: any) => municipioStyle(feature));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMunicipioCode]);
+
+  // Load puestos when a municipio is selected from department view or search bar
+  useEffect(() => {
+    if (currentJurisdiccion?.layer !== "departamentos") return;
+    if (!selectedMunicipioCode) {
+      setPuestos([]);
+      setSelectedPuesto(null);
+      return;
+    }
+    setSelectedPuesto(null);
+    api
+      .getPuestos({ municipio_codigo: selectedMunicipioCode, limit: 2500 })
+      .then(setPuestos)
+      .catch(console.error);
+  }, [selectedMunicipioCode, currentJurisdiccion?.layer]);
+
   const handleDepartmentClick = (feature: any) => {
     const deptCode = String(feature.properties.DPTO).padStart(2, "0");
     const deptName = feature.properties.NOMBRE_DPT;
@@ -436,10 +484,17 @@ export function ElectoralMap() {
     }
 
     layer.on({
+      click: () => {
+        const featureCode = municipioCodeFromFeature(feature);
+        if (featureCode) {
+          setSelectedMunicipioCode(featureCode);
+        }
+      },
       mouseover: (e: any) => {
         const featureCode = municipioCodeFromFeature(feature);
         const isSelected =
-          selectedMunicipioCode && featureCode === selectedMunicipioCode;
+          selectedMunicipioCodeRef.current &&
+          featureCode === selectedMunicipioCodeRef.current;
         if (!isSelected) {
           e.target.setStyle({ fillOpacity: 0.14, weight: 1.4 });
         }
@@ -447,7 +502,8 @@ export function ElectoralMap() {
       mouseout: (e: any) => {
         const featureCode = municipioCodeFromFeature(feature);
         const isSelected =
-          selectedMunicipioCode && featureCode === selectedMunicipioCode;
+          selectedMunicipioCodeRef.current &&
+          featureCode === selectedMunicipioCodeRef.current;
         if (isSelected) {
           e.target.setStyle({
             color: "#b45309",
@@ -523,7 +579,6 @@ export function ElectoralMap() {
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          noWrap={true}
         />
 
         {/* Show departments GeoJSON in general view */}
@@ -541,7 +596,10 @@ export function ElectoralMap() {
         {currentJurisdiccion?.layer === "departamentos" &&
           municipiosGeoJSON && (
             <GeoJSON
-              key={`${selectedDepartmentCode ?? "none"}-${selectedMunicipioCode ?? "none"}`}
+              key={selectedDepartmentCode ?? "none"}
+              ref={(r: any) => {
+                municipiosLayerRef.current = r;
+              }}
               data={municipiosGeoJSON}
               style={municipioStyle}
               interactive={true}
@@ -556,6 +614,9 @@ export function ElectoralMap() {
           <Marker
             key={puesto.codigo_puesto}
             position={[puesto.latitud, puesto.longitud]}
+            eventHandlers={{
+              click: () => setSelectedPuesto(puesto),
+            }}
           >
             <Popup>
               <div className="text-sm">
@@ -574,11 +635,22 @@ export function ElectoralMap() {
                     Potencial: {puesto.total.toLocaleString()}
                   </div>
                 )}
+                <button
+                  className="mt-2 text-xs text-blue-600 underline"
+                  onClick={() => setSelectedPuesto(puesto)}
+                >
+                  Ver detalles
+                </button>
               </div>
             </Popup>
           </Marker>
         ))}
       </MapContainer>
+
+      <PuestoDetailPanel
+        puesto={selectedPuesto}
+        onClose={() => setSelectedPuesto(null)}
+      />
     </div>
   );
 }

@@ -61,7 +61,14 @@ export const api = {
     limit?: number;
   }): Promise<PuestoElectoral[]> {
     const response = await apiClient.get('/api/v1/puestos', { params: filters });
-    return response.data;
+    const data = response.data;
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (data && Array.isArray(data.items)) {
+      return data.items;
+    }
+    return [];
   },
 
   // Search
