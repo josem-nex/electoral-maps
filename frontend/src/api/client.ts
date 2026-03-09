@@ -67,7 +67,22 @@ export const api = {
   // Search
   async search(query: string, limit: number = 20): Promise<SearchResult[]> {
     const response = await apiClient.get('/api/v1/search', { params: { q: query, limit } });
-    return response.data;
+    // El endpoint devuelve SearchPage { total, items } o un array directo
+    const data = response.data;
+    const items: any[] = Array.isArray(data) ? data : (data.items ?? []);
+    return items
+      .filter((item: any) => item.type === 'departamento' || item.type === 'municipio')
+      .map((item: any): SearchResult => ({
+        id: String(item.id),
+        type: item.type,
+        name: item.nombre_completo ?? '',
+        code: item.geo_code ?? String(item.id),
+        parent_code: item.parent_code,
+        parent_name: item.parent_name,
+        center_lat: item.center_lat ?? 4.57,
+        center_lon: item.center_lon ?? -74.30,
+        zoom: item.zoom ?? 8,
+      }));
   },
 
   // Get GeoJSON for departments

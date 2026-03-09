@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     api_port: int = 8000
     cors_origins: Annotated[List[str], NoDecode] = ["http://localhost:5173", "http://localhost:3000"]
     data_dir: Path = Path(__file__).resolve().parents[2] / "data"
+    database_url: str = "sqlite:///./electoral.db"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

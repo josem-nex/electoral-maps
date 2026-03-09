@@ -34,3 +34,9 @@ config.local.py
 # Data directory (but keep GeoJSON)
 data/*
 !data/colombia.geo.json
+openspec
+openspec/
+.pytest_cache/
+.pytest_cache
+.github/
+.github
