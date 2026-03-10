@@ -13,8 +13,8 @@ fi
 
 source .venv/bin/activate
 
-python -m pip install -q --upgrade pip
-python -m pip install -q -r requirements.txt
+# python -m pip install -q --upgrade pip
+# python -m pip install -q -r requirements.txt
 
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8000}"

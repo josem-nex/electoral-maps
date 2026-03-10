@@ -21,7 +21,7 @@ MVP del sistema de visualización electoral de Colombia con navegación por capa
 
 ## Estructura del Proyecto
 
-```
+````
 electoral-maps/
 ├── backend/
 │   ├── app/

@@ -24,6 +24,7 @@ from app.db_models import (
     PuestoORM,
 )
 from app.data_loader import (
+    build_departamentos_catalog,
     get_municipios_geojson_by_departamento,
     load_departamentos_geojson,
 )
@@ -332,16 +333,25 @@ def root():
 @app.get("/api/v1/jurisdicciones", response_model=List[JurisdiccionRead])
 def list_jurisdicciones(
     nivel: Optional[str] = Query(None),
+    layer: Optional[str] = Query(None),
     parent_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
 ):
     """List jurisdictions, optionally filtered by nivel and/or parent_id."""
     q = db.query(JurisdiccionORM)
-    if nivel is not None:
-        q = q.filter(JurisdiccionORM.nivel == nivel)
+    effective_nivel = nivel or layer
+    if effective_nivel is not None:
+        q = q.filter(JurisdiccionORM.nivel == effective_nivel)
     if parent_id is not None:
         q = q.filter(JurisdiccionORM.parent_id == parent_id)
     return q.all()
+
+
+@app.get("/api/v1/catalog/departamentos")
+def get_departamentos_catalog():
+    """Return departamentos catalog enriched with zone mapping."""
+    _, departamentos = build_departamentos_catalog()
+    return [item.model_dump() for item in departamentos]
 
 
 @app.post("/api/v1/jurisdicciones", response_model=JurisdiccionRead, status_code=201)

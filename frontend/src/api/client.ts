@@ -109,6 +109,11 @@ export const api = {
     return response.data;
   },
 
+  async getDepartamentosCatalog(): Promise<Jurisdiccion[]> {
+    const response = await apiClient.get('/api/v1/catalog/departamentos');
+    return response.data;
+  },
+
   // Get GeoJSON for municipalities in one department
   async getMunicipiosGeoJSON(departamentoCodigo: string): Promise<any> {
     const response = await apiClient.get('/api/v1/geojson/municipios', {
