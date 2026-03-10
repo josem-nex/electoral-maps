@@ -13,34 +13,34 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-try:
-    from app.config import settings
-    from app.database import Base, get_db  # noqa: F401 – re-exported for tests
-    from app.db_models import (
-        CatalogoNivelTerritorial,
-        CatalogoTipoJurisdiccion,
-        JurisdiccionORM,
-        PersonaORM,
-        PuestoORM,
-    )
-    from app.data_loader import (
-        get_municipios_geojson_by_departamento,
-        load_departamentos_geojson,
-    )
-except ModuleNotFoundError:
-    from config import settings  # type: ignore
-    from database import Base, get_db  # type: ignore  # noqa: F401
-    from db_models import (  # type: ignore
-        CatalogoNivelTerritorial,
-        CatalogoTipoJurisdiccion,
-        JurisdiccionORM,
-        PersonaORM,
-        PuestoORM,
-    )
-    from data_loader import (  # type: ignore
-        get_municipios_geojson_by_departamento,
-        load_departamentos_geojson,
-    )
+# try:
+from app.config import settings
+from app.database import Base, get_db  # noqa: F401 – re-exported for tests
+from app.db_models import (
+    CatalogoNivelTerritorial,
+    CatalogoTipoJurisdiccion,
+    JurisdiccionORM,
+    PersonaORM,
+    PuestoORM,
+)
+from app.data_loader import (
+    get_municipios_geojson_by_departamento,
+    load_departamentos_geojson,
+)
+# except ModuleNotFoundError:
+#     from config import settings  # type: ignore
+#     from database import Base, get_db  # type: ignore  # noqa: F401
+#     from db_models import (  # type: ignore
+#         CatalogoNivelTerritorial,
+#         CatalogoTipoJurisdiccion,
+#         JurisdiccionORM,
+#         PersonaORM,
+#         PuestoORM,
+#     )
+#     from data_loader import (  # type: ignore
+#         get_municipios_geojson_by_departamento,
+#         load_departamentos_geojson,
+#     )
 
 # ---------------------------------------------------------------------------
 # Hierarchy validation: nivel → expected parent nivel (None = top-level)
@@ -149,6 +149,18 @@ class AnalyticsResponse(BaseModel):
     anio: Optional[int]
     corporacion: Optional[str]
     datos: AnalyticsDatos
+
+
+class TerritorioAnalyticsResponse(BaseModel):
+    """Aggregated puestos statistics for a department or municipality."""
+    tipo: str
+    codigo: str
+    nombre: Optional[str] = None
+    puestos_count: int
+    mesas_sum: int
+    total_sum: int
+    mujeres_sum: int
+    hombres_sum: int
 
 
 # ---------------------------------------------------------------------------
@@ -457,7 +469,7 @@ def list_puestos(
                 effective_limit = min(limit, LIMIT_CAP)
                 total = q.count()
                 items = q.limit(effective_limit).all()
-                return PuestosPage(total=total, limit=effective_limit, items=items)
+                return PuestosPage(total=total, limit=effective_limit, items=[PuestoRead.model_validate(item) for item in items])
 
         if municipio_name:
             fallback_rows = []
@@ -484,7 +496,7 @@ def list_puestos(
     effective_limit = min(limit, LIMIT_CAP)
     total = q.count()
     items = q.limit(effective_limit).all()
-    return PuestosPage(total=total, limit=effective_limit, items=items)
+    return PuestosPage(total=total, limit=effective_limit, items=[PuestoRead.model_validate(item) for item in items])
 
 
 @app.post("/api/v1/puestos", response_model=PuestoRead, status_code=201)
@@ -643,6 +655,118 @@ def analytics(
         anio=anio,
         corporacion=corporacion,
         datos=AnalyticsDatos(puestos=puestos_count, mesas=int(mesas_sum)),
+    )
+
+
+_VALID_TERRITORIO_TIPOS = {"departamento", "municipio"}
+
+
+def _aggregate_rows(rows: list) -> dict:
+    """Compute puestos aggregates from a list of PuestoORM rows."""
+    return dict(
+        puestos_count=len(rows),
+        mesas_sum=sum(r.mesas or 0 for r in rows),
+        total_sum=sum(r.total or 0 for r in rows),
+        mujeres_sum=sum(r.mujeres or 0 for r in rows),
+        hombres_sum=sum(r.hombres or 0 for r in rows),
+    )
+
+
+@app.get("/api/v1/analytics/territorio", response_model=TerritorioAnalyticsResponse)
+def analytics_territorio(
+    tipo: str = Query(..., description="Tipo de territorio: 'departamento' o 'municipio'"),
+    codigo: str = Query(..., description="Código DANE del territorio"),
+    db: Session = Depends(get_db),
+):
+    """Return aggregated puestos statistics for a department or municipality.
+
+    Uses the same DANE-code → name resolution + name-based matching as
+    list_puestos to handle the mismatch between DANE codes (GeoJSON/frontend)
+    and the electoral codes stored in the puestos table.
+    """
+    if tipo not in _VALID_TERRITORIO_TIPOS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"tipo debe ser uno de: {sorted(_VALID_TERRITORIO_TIPOS)}",
+        )
+
+    codigo = codigo.strip()
+
+    # -----------------------------------------------------------------------
+    # Departamento
+    # -----------------------------------------------------------------------
+    if tipo == "departamento":
+        if not re.fullmatch(r"\d{1,2}", codigo):
+            raise HTTPException(
+                status_code=422,
+                detail="Para tipo=departamento, codigo debe ser numérico de 1 o 2 dígitos",
+            )
+        normalized = codigo.zfill(2)
+        nombre = _departamento_name_by_code().get(normalized)
+        nombre_norm = _normalize_text(nombre) if nombre else None
+
+        # 1) Try direct code match
+        rows = db.query(PuestoORM).filter(PuestoORM.departamento_codigo == normalized).all()
+
+        # 2) Name-validate: keep only rows whose departamento name matches the
+        #    GeoJSON name (guards against electoral/DANE code collision).
+        if rows and nombre_norm:
+            matched = [r for r in rows if _normalize_text(r.departamento) == nombre_norm]
+            if matched:
+                rows = matched
+            else:
+                # Code collision: rows belong to a different department → name search
+                rows = []
+
+        # 3) Name-based fallback when no rows found by code (DANE ≠ electoral code)
+        if not rows and nombre_norm:
+            rows = [
+                r for r in db.query(PuestoORM).all()
+                if _normalize_text(r.departamento) == nombre_norm
+            ]
+
+        return TerritorioAnalyticsResponse(
+            tipo=tipo,
+            codigo=normalized,
+            nombre=nombre,
+            **_aggregate_rows(rows),
+        )
+
+    # -----------------------------------------------------------------------
+    # Municipio  — mirrors list_puestos name-matching logic exactly
+    # -----------------------------------------------------------------------
+    if not re.fullmatch(r"\d{1,5}", codigo):
+        raise HTTPException(
+            status_code=422,
+            detail="Para tipo=municipio, codigo debe ser numérico de hasta 5 dígitos",
+        )
+    normalized = codigo.zfill(5)
+    nombre = _municipio_name_by_code(normalized)
+    dept_nombre = _departamento_name_by_code().get(normalized[:2])
+    dept_norm = _normalize_text(dept_nombre) if dept_nombre else None
+
+    def _mun_matches(row) -> bool:
+        if not _municipio_names_match(nombre, row.municipio):
+            return False
+        if dept_norm and _normalize_text(row.departamento) != dept_norm:
+            return False
+        return True
+
+    # 1) Try direct code match + name validation
+    rows = db.query(PuestoORM).filter(PuestoORM.municipio_codigo == normalized).all()
+    if rows and nombre:
+        matched = [r for r in rows if _mun_matches(r)]
+        rows = matched  # empty list triggers fallback below
+
+    # 2) Name-based fallback (same as list_puestos)
+    if not rows and nombre:
+        rows = [r for r in db.query(PuestoORM).all() if _mun_matches(r)]
+
+    return TerritorioAnalyticsResponse(
+        tipo=tipo,
+        codigo=normalized,
+        nombre=nombre,
+        **_aggregate_rows(rows),
     )
 
 

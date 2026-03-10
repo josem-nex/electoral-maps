@@ -38,6 +38,17 @@ export interface SearchResult {
   zoom: number;
 }
 
+export interface TerritorioStats {
+  tipo: string;
+  codigo: string;
+  nombre?: string;
+  puestos_count: number;
+  mesas_sum: number;
+  total_sum: number;
+  mujeres_sum: number;
+  hombres_sum: number;
+}
+
 export const api = {
   // Get jurisdictions by layer
   async getJurisdicciones(layer: ElectoralLayer, parentCode?: string): Promise<Jurisdiccion[]> {
@@ -102,6 +113,17 @@ export const api = {
   async getMunicipiosGeoJSON(departamentoCodigo: string): Promise<any> {
     const response = await apiClient.get('/api/v1/geojson/municipios', {
       params: { departamento_codigo: departamentoCodigo },
+    });
+    return response.data;
+  },
+
+  // Get aggregated puestos statistics for a territory (department or municipality)
+  async getAnalyticsTerritorio(
+    tipo: 'departamento' | 'municipio',
+    codigo: string,
+  ): Promise<TerritorioStats> {
+    const response = await apiClient.get('/api/v1/analytics/territorio', {
+      params: { tipo, codigo },
     });
     return response.data;
   },

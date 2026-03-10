@@ -11,9 +11,10 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useNavigationStore } from "../stores/navigationStore";
 import { api } from "../api/client";
-import type { PuestoElectoral } from "../api/client";
+import type { PuestoElectoral, TerritorioStats } from "../api/client";
 import type { Jurisdiccion } from "../stores/navigationStore";
 import { PuestoDetailPanel } from "./PuestoDetailPanel";
+import { TeritorioStatsPanel } from "./TeritorioStatsPanel";
 
 // Fix for default marker icons in webpack
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -207,6 +208,15 @@ export function ElectoralMap() {
   );
   const [loading, setLoading] = useState(false);
 
+  // Territory stats panel state
+  const [territorioStats, setTerritorioStats] =
+    useState<TerritorioStats | null>(null);
+  const [territorioStatsLoading, setTerritorioStatsLoading] = useState(false);
+  const [territorioStatsError, setTerritorioStatsError] = useState(false);
+  const [territorioTipo, setTerritorioTipo] = useState<
+    "departamento" | "municipio" | null
+  >(null);
+
   // Ref to keep selectedMunicipioCode accessible in stale Leaflet closures
   const selectedMunicipioCodeRef = useRef<string | null>(selectedMunicipioCode);
   useEffect(() => {
@@ -389,6 +399,58 @@ export function ElectoralMap() {
     selectedMunicipioCode,
     selectedDepartmentCode,
     currentJurisdiccion?.layer,
+  ]);
+
+  // Load aggregated territory statistics when a department or municipality is selected
+  useEffect(() => {
+    const layer = currentJurisdiccion?.layer;
+    if (!layer || !["departamentos", "municipio"].includes(layer)) {
+      setTerritorioStats(null);
+      setTerritorioStatsError(false);
+      return;
+    }
+
+    let tipo: "departamento" | "municipio" | null = null;
+    let codigo: string | null = null;
+
+    if (layer === "departamentos") {
+      if (selectedMunicipioCode) {
+        tipo = "municipio";
+        codigo = selectedMunicipioCode;
+      } else if (selectedDepartmentCode) {
+        tipo = "departamento";
+        codigo = selectedDepartmentCode;
+      }
+    } else if (layer === "municipio" && currentJurisdiccion?.id) {
+      const parts = currentJurisdiccion.id.split(":");
+      const munCode = parts[1];
+      if (munCode) {
+        tipo = "municipio";
+        codigo = munCode;
+      }
+    }
+
+    if (!tipo || !codigo) {
+      setTerritorioStats(null);
+      setTerritorioStatsError(false);
+      return;
+    }
+
+    setTerritorioTipo(tipo);
+    setTerritorioStatsLoading(true);
+    setTerritorioStatsError(false);
+    setTerritorioStats(null);
+
+    api
+      .getAnalyticsTerritorio(tipo, codigo)
+      .then((data) => setTerritorioStats(data))
+      .catch(() => setTerritorioStatsError(true))
+      .finally(() => setTerritorioStatsLoading(false));
+  }, [
+    currentJurisdiccion?.layer,
+    currentJurisdiccion?.id,
+    selectedDepartmentCode,
+    selectedMunicipioCode,
   ]);
 
   const handleDepartmentClick = (feature: any) => {
@@ -660,6 +722,20 @@ export function ElectoralMap() {
         puesto={selectedPuesto}
         onClose={() => setSelectedPuesto(null)}
       />
+
+      {/* Territory stats panel — only shown when no individual puesto is selected */}
+      {!selectedPuesto && (
+        <TeritorioStatsPanel
+          stats={territorioStats}
+          loading={territorioStatsLoading}
+          error={territorioStatsError}
+          tipo={territorioTipo}
+          onClose={() => {
+            setTerritorioStats(null);
+            setTerritorioStatsError(false);
+          }}
+        />
+      )}
     </div>
   );
 }

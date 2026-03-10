@@ -501,6 +501,172 @@ def test_search_persona_y_analytics(client: TestClient) -> None:
     assert analytics_payload["datos"]["mesas"] == 2
 
 
+def _create_puestos_for_territorio(client: TestClient) -> None:
+    """Seed two puestos in Antioquia / Medellín for analytics territory tests."""
+    for codigo, mujeres, hombres, total, mesas in [
+        ("TPUESTO01", 100, 120, 220, 5),
+        ("TPUESTO02", 80, 90, 170, 4),
+    ]:
+        resp = client.post(
+            "/api/v1/puestos",
+            json={
+                "codigo_puesto": codigo,
+                "departamento_codigo": "05",
+                "municipio_codigo": "05001",
+                "departamento": "Antioquia",
+                "municipio": "Medellín",
+                "puesto": f"Puesto {codigo}",
+                "mujeres": mujeres,
+                "hombres": hombres,
+                "total": total,
+                "mesas": mesas,
+                "latitud": 6.24,
+                "longitud": -75.58,
+            },
+        )
+        assert resp.status_code == 201
+
+
+def test_analytics_territorio_departamento_valido(client: TestClient) -> None:
+    _create_hierarchy(client)
+    _create_puestos_for_territorio(client)
+
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "departamento", "codigo": "05"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+
+    assert payload["tipo"] == "departamento"
+    assert payload["codigo"] == "05"
+    assert payload["puestos_count"] == 2
+    assert payload["mesas_sum"] == 9       # 5 + 4
+    assert payload["total_sum"] == 390     # 220 + 170
+    assert payload["mujeres_sum"] == 180   # 100 + 80
+    assert payload["hombres_sum"] == 210   # 120 + 90
+
+
+def test_analytics_territorio_municipio_valido(client: TestClient) -> None:
+    _create_hierarchy(client)
+    _create_puestos_for_territorio(client)
+
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "municipio", "codigo": "05001"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+
+    assert payload["tipo"] == "municipio"
+    assert payload["codigo"] == "05001"
+    assert payload["puestos_count"] == 2
+    assert payload["mesas_sum"] == 9
+    assert payload["mujeres_sum"] == 180
+
+
+def test_analytics_territorio_sin_puestos_devuelve_ceros(client: TestClient) -> None:
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "departamento", "codigo": "99"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["puestos_count"] == 0
+    assert payload["mesas_sum"] == 0
+    assert payload["total_sum"] == 0
+    assert payload["mujeres_sum"] == 0
+    assert payload["hombres_sum"] == 0
+
+
+def test_analytics_territorio_tipo_invalido_devuelve_422(client: TestClient) -> None:
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "localidad", "codigo": "05001"},
+    )
+    assert resp.status_code == 422
+
+
+def test_analytics_territorio_codigo_invalido_departamento_devuelve_422(client: TestClient) -> None:
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "departamento", "codigo": "ABCD"},
+    )
+    assert resp.status_code == 422
+
+
+def test_analytics_territorio_codigo_invalido_municipio_devuelve_422(client: TestClient) -> None:
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "municipio", "codigo": "ABCDE"},
+    )
+    assert resp.status_code == 422
+
+
+def test_analytics_territorio_codigo_1_digito_departamento(client: TestClient) -> None:
+    """Single-digit department code should be accepted (normalized to 2 digits)."""
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "departamento", "codigo": "5"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["codigo"] == "05"
+
+
+def test_analytics_territorio_departamento_nombre_fallback(client: TestClient) -> None:
+    """When DANE code != electoral code in DB, name-based fallback must find the puestos.
+
+    Simulates: DANE código 05 = 'ANTIOQUIA' but the electoral system stores
+    Antioquia puestos under departamento_codigo='01'. The endpoint should
+    resolve by department name, not raw code.
+    """
+    # Seed puestos whose departamento_codigo ('01') won't match the DANE query
+    # code ('05'), but whose departamento name IS 'Antioquia'.
+    for codigo in ["FALLBACK01", "FALLBACK02"]:
+        resp = client.post(
+            "/api/v1/puestos",
+            json={
+                "codigo_puesto": codigo,
+                "departamento_codigo": "01",         # electoral code for Antioquia
+                "municipio_codigo": "01001",
+                "departamento": "Antioquia",         # name matches DANE "05"
+                "municipio": "Medellín",
+                "puesto": f"Puesto {codigo}",
+                "mujeres": 50,
+                "hombres": 60,
+                "total": 110,
+                "mesas": 3,
+                "latitud": 6.24,
+                "longitud": -75.58,
+            },
+        )
+        assert resp.status_code == 201
+
+    # Query with DANE code 05 (Antioquia).  Direct code would return 0 (no
+    # departamento_codigo='05' rows exist); name fallback should find 2.
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "departamento", "codigo": "05"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["puestos_count"] == 2
+    assert payload["mesas_sum"] == 6
+    assert payload["mujeres_sum"] == 100
+    assert payload["hombres_sum"] == 120
+
+
+def test_analytics_endpoint_original_no_alterado(client: TestClient) -> None:
+    """Ensure existing /api/v1/analytics endpoint still works without regression."""
+    resp = client.get("/api/v1/analytics")
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert "datos" in payload
+    assert "puestos" in payload["datos"]
+    assert "mesas" in payload["datos"]
+
+
 def test_latencia_bbox_objetivo_mvp(client: TestClient) -> None:
     hierarchy = _create_hierarchy(client)
 
