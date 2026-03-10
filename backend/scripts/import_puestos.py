@@ -135,7 +135,8 @@ def import_puestos(
         ws = wb.active
     except Exception as e:
         return {'error': f"Error leyendo archivo Excel: {e}"}
-    
+    if not ws:
+        return {'error': "No se pudo acceder a la hoja de Excel"}
     # Buscar fila de header (buscar en las primeras 10 filas)
     header_row_idx = 1
     header = None
