@@ -124,7 +124,7 @@ export const api = {
 
   // Get aggregated puestos statistics for a territory (department or municipality)
   async getAnalyticsTerritorio(
-    tipo: 'departamento' | 'municipio',
+    tipo: 'pais' | 'zona' | 'departamento' | 'municipio',
     codigo: string,
   ): Promise<TerritorioStats> {
     const response = await apiClient.get('/api/v1/analytics/territorio', {

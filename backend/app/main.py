@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import re
-import unicodedata
 from difflib import SequenceMatcher
 from functools import lru_cache
 from typing import Any, List, Optional
@@ -11,6 +10,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import func
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 # try:
@@ -27,6 +27,15 @@ from app.data_loader import (
     build_departamentos_catalog,
     get_municipios_geojson_by_departamento,
     load_departamentos_geojson,
+    normalize_text,
+)
+from app.territorial_stats_cache import (
+    VALID_TERRITORIO_TIPOS,
+    aggregate_rows as aggregate_rows_cached,
+    compute_territorio_analytics,
+    get_cached_territorio_stats,
+    normalize_tipo_codigo,
+    upsert_territorio_stats_cache,
 )
 # except ModuleNotFoundError:
 #     from config import settings  # type: ignore
@@ -55,6 +64,26 @@ NIVEL_PARENT: dict[str, str | None] = {
 }
 
 LIMIT_CAP = 1000
+MUNICIPIO_NOISE_TOKENS = {
+    "DE",
+    "DEL",
+    "LA",
+    "LAS",
+    "LOS",
+    "EL",
+    "SAN",
+    "SANTA",
+    "SANTO",
+    "SANTIAGO",
+    "VILLA",
+    "CIUDAD",
+    "DISTRITO",
+    "GUADALAJARA",
+    "CRUZ",
+    "JOSE",
+    "DIEGO",
+    "LUIS",
+}
 
 # ---------------------------------------------------------------------------
 # Pydantic request/response schemas
@@ -153,7 +182,7 @@ class AnalyticsResponse(BaseModel):
 
 
 class TerritorioAnalyticsResponse(BaseModel):
-    """Aggregated puestos statistics for a department or municipality."""
+    """Aggregated puestos statistics for pais/zona/departamento/municipio."""
     tipo: str
     codigo: str
     nombre: Optional[str] = None
@@ -247,21 +276,22 @@ def _validate_parent(nivel: str, parent_id: int | None, db: Session) -> None:
 
 
 def _normalize_text(value: str | None) -> str:
-    if value is None:
-        return ""
-    text = str(value).strip().upper()
-    text = unicodedata.normalize("NFKD", text)
-    text = "".join(ch for ch in text if not unicodedata.combining(ch))
-    text = re.sub(r"[^A-Z0-9 ]+", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+    return normalize_text(value)
 
 
 def _normalize_municipio_name(value: str | None) -> str:
     if value is None:
         return ""
-    base = re.sub(r"\([^)]*\)", " ", str(value))
+    base = str(value).replace("(", " ").replace(")", " ")
     return _normalize_text(base)
+
+
+def _municipio_informative_tokens(value: str | None) -> set[str]:
+    return {
+        token
+        for token in _normalize_municipio_name(value).split()
+        if len(token) >= 4 and token not in MUNICIPIO_NOISE_TOKENS
+    }
 
 
 def _municipio_names_match(expected_name: str | None, candidate_name: str | None) -> bool:
@@ -278,10 +308,37 @@ def _municipio_names_match(expected_name: str | None, candidate_name: str | None
         if len(shorter) >= 6:
             return True
 
+    expected_tokens = expected.split()
+    candidate_tokens = candidate.split()
+    if len(expected_tokens) == 1 and len(expected_tokens[0]) >= 6:
+        if expected_tokens[0] in candidate_tokens:
+            return True
+    if len(candidate_tokens) == 1 and len(candidate_tokens[0]) >= 6:
+        if candidate_tokens[0] in expected_tokens:
+            return True
+
+    expected_info = _municipio_informative_tokens(expected_name)
+    candidate_info = _municipio_informative_tokens(candidate_name)
+    if expected_info and candidate_info:
+        if expected_info.issubset(candidate_info) or candidate_info.issubset(expected_info):
+            return True
+
+        if len(expected_info) == 1 or len(candidate_info) == 1:
+            for expected_token in expected_info:
+                for candidate_token in candidate_info:
+                    if min(len(expected_token), len(candidate_token)) < 5:
+                        continue
+                    similarity = SequenceMatcher(None, expected_token, candidate_token).ratio()
+                    if similarity >= 0.83:
+                        return True
+
     compact_expected = expected.replace(" ", "")
     compact_candidate = candidate.replace(" ", "")
     similarity = SequenceMatcher(None, compact_expected, compact_candidate).ratio()
-    return similarity >= 0.9
+    if similarity >= 0.9:
+        return True
+
+    return False
 
 
 @lru_cache(maxsize=1)
@@ -668,116 +725,72 @@ def analytics(
     )
 
 
-_VALID_TERRITORIO_TIPOS = {"departamento", "municipio"}
-
-
 def _aggregate_rows(rows: list) -> dict:
     """Compute puestos aggregates from a list of PuestoORM rows."""
-    return dict(
-        puestos_count=len(rows),
-        mesas_sum=sum(r.mesas or 0 for r in rows),
-        total_sum=sum(r.total or 0 for r in rows),
-        mujeres_sum=sum(r.mujeres or 0 for r in rows),
-        hombres_sum=sum(r.hombres or 0 for r in rows),
-    )
+    return aggregate_rows_cached(rows)
 
 
 @app.get("/api/v1/analytics/territorio", response_model=TerritorioAnalyticsResponse)
 def analytics_territorio(
-    tipo: str = Query(..., description="Tipo de territorio: 'departamento' o 'municipio'"),
+    tipo: str = Query(..., description="Tipo de territorio: 'pais', 'zona', 'departamento' o 'municipio'"),
     codigo: str = Query(..., description="Código DANE del territorio"),
     db: Session = Depends(get_db),
 ):
-    """Return aggregated puestos statistics for a department or municipality.
+    """Return cached or computed aggregated puestos statistics by territory."""
+    try:
+        normalized_tipo, normalized_codigo = normalize_tipo_codigo(tipo, codigo)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    Uses the same DANE-code → name resolution + name-based matching as
-    list_puestos to handle the mismatch between DANE codes (GeoJSON/frontend)
-    and the electoral codes stored in the puestos table.
-    """
-    if tipo not in _VALID_TERRITORIO_TIPOS:
-        raise HTTPException(
-            status_code=422,
-            detail=f"tipo debe ser uno de: {sorted(_VALID_TERRITORIO_TIPOS)}",
-        )
+    cache_available = True
 
-    codigo = codigo.strip()
+    try:
+        cached = get_cached_territorio_stats(db, normalized_tipo, normalized_codigo)
+    except OperationalError as exc:
+        if "territorio_stats_cache" not in str(exc).lower():
+            raise
+        db.rollback()
+        cache_available = False
+        cached = None
 
-    # -----------------------------------------------------------------------
-    # Departamento
-    # -----------------------------------------------------------------------
-    if tipo == "departamento":
-        if not re.fullmatch(r"\d{1,2}", codigo):
-            raise HTTPException(
-                status_code=422,
-                detail="Para tipo=departamento, codigo debe ser numérico de 1 o 2 dígitos",
+    if cached is not None:
+        if normalized_tipo in {"municipio", "departamento"} and cached.get("puestos_count", 0) == 0:
+            recomputed = compute_territorio_analytics(
+                tipo=normalized_tipo,
+                codigo=normalized_codigo,
+                db=db,
+                departamento_name_by_code=_departamento_name_by_code,
+                municipio_name_by_code=_municipio_name_by_code,
             )
-        normalized = codigo.zfill(2)
-        nombre = _departamento_name_by_code().get(normalized)
-        nombre_norm = _normalize_text(nombre) if nombre else None
+            if recomputed.get("puestos_count", 0) > 0:
+                if cache_available:
+                    try:
+                        upsert_territorio_stats_cache(db, recomputed)
+                        db.commit()
+                    except OperationalError as exc:
+                        if "territorio_stats_cache" not in str(exc).lower():
+                            raise
+                        db.rollback()
+                return TerritorioAnalyticsResponse(**recomputed)
+        return TerritorioAnalyticsResponse(**cached)
 
-        # 1) Try direct code match
-        rows = db.query(PuestoORM).filter(PuestoORM.departamento_codigo == normalized).all()
-
-        # 2) Name-validate: keep only rows whose departamento name matches the
-        #    GeoJSON name (guards against electoral/DANE code collision).
-        if rows and nombre_norm:
-            matched = [r for r in rows if _normalize_text(r.departamento) == nombre_norm]
-            if matched:
-                rows = matched
-            else:
-                # Code collision: rows belong to a different department → name search
-                rows = []
-
-        # 3) Name-based fallback when no rows found by code (DANE ≠ electoral code)
-        if not rows and nombre_norm:
-            rows = [
-                r for r in db.query(PuestoORM).all()
-                if _normalize_text(r.departamento) == nombre_norm
-            ]
-
-        return TerritorioAnalyticsResponse(
-            tipo=tipo,
-            codigo=normalized,
-            nombre=nombre,
-            **_aggregate_rows(rows),
-        )
-
-    # -----------------------------------------------------------------------
-    # Municipio  — mirrors list_puestos name-matching logic exactly
-    # -----------------------------------------------------------------------
-    if not re.fullmatch(r"\d{1,5}", codigo):
-        raise HTTPException(
-            status_code=422,
-            detail="Para tipo=municipio, codigo debe ser numérico de hasta 5 dígitos",
-        )
-    normalized = codigo.zfill(5)
-    nombre = _municipio_name_by_code(normalized)
-    dept_nombre = _departamento_name_by_code().get(normalized[:2])
-    dept_norm = _normalize_text(dept_nombre) if dept_nombre else None
-
-    def _mun_matches(row) -> bool:
-        if not _municipio_names_match(nombre, row.municipio):
-            return False
-        if dept_norm and _normalize_text(row.departamento) != dept_norm:
-            return False
-        return True
-
-    # 1) Try direct code match + name validation
-    rows = db.query(PuestoORM).filter(PuestoORM.municipio_codigo == normalized).all()
-    if rows and nombre:
-        matched = [r for r in rows if _mun_matches(r)]
-        rows = matched  # empty list triggers fallback below
-
-    # 2) Name-based fallback (same as list_puestos)
-    if not rows and nombre:
-        rows = [r for r in db.query(PuestoORM).all() if _mun_matches(r)]
-
-    return TerritorioAnalyticsResponse(
-        tipo=tipo,
-        codigo=normalized,
-        nombre=nombre,
-        **_aggregate_rows(rows),
+    payload = compute_territorio_analytics(
+        tipo=normalized_tipo,
+        codigo=normalized_codigo,
+        db=db,
+        departamento_name_by_code=_departamento_name_by_code,
+        municipio_name_by_code=_municipio_name_by_code,
     )
+    if cache_available:
+        try:
+            upsert_territorio_stats_cache(db, payload)
+            db.commit()
+        except OperationalError as exc:
+            if "territorio_stats_cache" not in str(exc).lower():
+                raise
+            db.rollback()
+
+    return TerritorioAnalyticsResponse(**payload)
 
 
 # ---------------------------------------------------------------------------

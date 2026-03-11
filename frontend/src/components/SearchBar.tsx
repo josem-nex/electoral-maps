@@ -9,7 +9,7 @@ export function SearchBar() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
-  const { navigateTo, setSelectedMunicipioCode } = useNavigationStore();
+  const { navigateTo, setSelectedMunicipioCode, reset } = useNavigationStore();
 
   const handleSearch = async (searchQuery: string) => {
     setQuery(searchQuery);
@@ -38,6 +38,7 @@ export function SearchBar() {
   const handleResultClick = async (result: SearchResult) => {
     try {
       if (result.type === "municipio" && result.parent_code) {
+        reset();
         const departamentos = await api.getJurisdicciones("departamentos");
         const dept = departamentos.find((d) => d.code === result.parent_code);
 
@@ -58,6 +59,7 @@ export function SearchBar() {
           setSelectedMunicipioCode(result.code);
         }
       } else if (result.type === "departamento") {
+        reset();
         const jurisdiccion: Jurisdiccion = {
           id: result.id,
           layer: "departamentos",

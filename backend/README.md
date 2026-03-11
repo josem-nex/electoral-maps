@@ -90,3 +90,19 @@ Desde `backend/`:
 ```bash
 pytest -q
 ```
+
+## Cache de analytics territorial
+
+El endpoint `GET /api/v1/analytics/territorio` ahora soporta `tipo=pais|zona|departamento|municipio` y prioriza lectura desde cache persistente (`territorio_stats_cache`).
+
+En caso de cache miss, el backend calcula el agregado, lo persiste (upsert) y devuelve la respuesta.
+
+### Refresco completo de cache
+
+Desde `backend/`:
+
+```bash
+python scripts/refresh_territorial_stats_cache.py
+```
+
+El comando recalcula y actualiza agregados para país, zonas, departamentos y municipios.

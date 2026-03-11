@@ -10,8 +10,9 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base
-from app.db_models import PersonaORM
-from app.main import app, get_db, _seed_catalogs
+from app.db_models import PersonaORM, TerritorioStatsCacheORM
+from app.data_loader import build_departamentos_catalog
+from app.main import app, get_db, _municipio_names_match, _seed_catalogs
 
 
 @pytest.fixture()
@@ -565,6 +566,73 @@ def test_analytics_territorio_municipio_valido(client: TestClient) -> None:
     assert payload["mujeres_sum"] == 180
 
 
+def test_analytics_territorio_pais_valido(client: TestClient) -> None:
+    _create_hierarchy(client)
+    _create_puestos_for_territorio(client)
+
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "pais", "codigo": "CO"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+
+    assert payload["tipo"] == "pais"
+    assert payload["codigo"] == "CO"
+    assert payload["nombre"] == "Colombia"
+    assert payload["puestos_count"] == 2
+    assert payload["mesas_sum"] == 9
+
+
+def test_analytics_territorio_zona_valido(client: TestClient) -> None:
+    _create_hierarchy(client)
+    _create_puestos_for_territorio(client)
+
+    _, departamentos = build_departamentos_catalog()
+    antioquia = next((d for d in departamentos if d.code == "05"), None)
+    assert antioquia is not None
+    zone_id = antioquia.zone_id
+    assert zone_id is not None
+
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "zona", "codigo": str(zone_id)},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+
+    assert payload["tipo"] == "zona"
+    assert payload["codigo"] == str(zone_id)
+    assert payload["puestos_count"] >= 2
+    assert payload["mesas_sum"] >= 9
+
+
+def test_analytics_territorio_cache_persistente(client: TestClient) -> None:
+    _create_hierarchy(client)
+    _create_puestos_for_territorio(client)
+
+    first_resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "departamento", "codigo": "05"},
+    )
+    assert first_resp.status_code == 200
+
+    with app.state.testing_session_local() as db:
+        cached = db.query(TerritorioStatsCacheORM).filter_by(
+            tipo="departamento",
+            codigo="05",
+        ).first()
+        assert cached is not None
+        assert cached.puestos_count == 2
+
+    second_resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "departamento", "codigo": "05"},
+    )
+    assert second_resp.status_code == 200
+    assert second_resp.json()["puestos_count"] == 2
+
+
 def test_analytics_territorio_sin_puestos_devuelve_ceros(client: TestClient) -> None:
     resp = client.get(
         "/api/v1/analytics/territorio",
@@ -583,6 +651,22 @@ def test_analytics_territorio_tipo_invalido_devuelve_422(client: TestClient) -> 
     resp = client.get(
         "/api/v1/analytics/territorio",
         params={"tipo": "localidad", "codigo": "05001"},
+    )
+    assert resp.status_code == 422
+
+
+def test_analytics_territorio_codigo_invalido_pais_devuelve_422(client: TestClient) -> None:
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "pais", "codigo": "XX"},
+    )
+    assert resp.status_code == 422
+
+
+def test_analytics_territorio_codigo_invalido_zona_devuelve_422(client: TestClient) -> None:
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "zona", "codigo": "Z1"},
     )
     assert resp.status_code == 422
 
@@ -655,6 +739,179 @@ def test_analytics_territorio_departamento_nombre_fallback(client: TestClient) -
     assert payload["mesas_sum"] == 6
     assert payload["mujeres_sum"] == 100
     assert payload["hombres_sum"] == 120
+
+
+def test_puestos_municipio_nombre_largo_vs_corto_fallback(client: TestClient) -> None:
+    """Official municipality long name should match short operational name.
+
+    Example: SAN ANDRÉS DE TUMACO (official) vs TUMACO (stored in puestos).
+    """
+    create_resp = client.post(
+        "/api/v1/puestos",
+        json={
+            "codigo_puesto": "P-TUMACO-001",
+            "departamento_codigo": "23",  # código legado en datos fuente
+            "municipio_codigo": "23139",  # código legado en datos fuente
+            "departamento": "NARIÑO",
+            "municipio": "TUMACO",
+            "puesto": "IE Tumaco Centro",
+            "latitud": 1.81,
+            "longitud": -78.76,
+            "anio": 2022,
+            "corporacion": "senado",
+        },
+    )
+    assert create_resp.status_code == 201
+
+    list_resp = client.get(
+        "/api/v1/puestos",
+        params={
+            "municipio_codigo": "52835",  # DANE oficial: SAN ANDRÉS DE TUMACO
+            "limit": 100,
+        },
+    )
+    assert list_resp.status_code == 200
+    payload = list_resp.json()
+    assert payload["total"] == 1
+    assert payload["items"][0]["codigo_puesto"] == "P-TUMACO-001"
+
+
+@pytest.mark.parametrize(
+    ("expected_name", "candidate_name"),
+    [
+        ("SANTA CRUZ DE MOMPOX", "MOMPOS"),
+        ("PAPUNAHUA", "MORICHAL (PAPUNAGUA)"),
+    ],
+)
+def test_municipio_names_match_variantes_catalogo(
+    expected_name: str,
+    candidate_name: str,
+) -> None:
+    assert _municipio_names_match(expected_name, candidate_name) is True
+
+
+@pytest.mark.parametrize(
+    ("codigo_puesto", "departamento_codigo", "municipio_codigo", "departamento", "municipio", "query_codigo"),
+    [
+        (
+            "P-CUCUTA-001",
+            "25",
+            "25001",
+            "NORTE DE SAN",
+            "CUCUTA",
+            "54001",
+        ),
+        (
+            "P-CALI-001",
+            "31",
+            "31001",
+            "VALLE",
+            "CALI",
+            "76001",
+        ),
+        (
+            "P-MOMPOS-001",
+            "05",
+            "05043",
+            "BOLIVAR",
+            "MOMPOS",
+            "13468",
+        ),
+        (
+            "P-PACOA-001",
+            "68",
+            "68013",
+            "VAUPES",
+            "BUENOS AIRES (PACOA)",
+            "97511",
+        ),
+    ],
+)
+def test_puestos_municipio_variantes_historicas_fallback(
+    client: TestClient,
+    codigo_puesto: str,
+    departamento_codigo: str,
+    municipio_codigo: str,
+    departamento: str,
+    municipio: str,
+    query_codigo: str,
+) -> None:
+    create_resp = client.post(
+        "/api/v1/puestos",
+        json={
+            "codigo_puesto": codigo_puesto,
+            "departamento_codigo": departamento_codigo,
+            "municipio_codigo": municipio_codigo,
+            "departamento": departamento,
+            "municipio": municipio,
+            "puesto": f"Puesto {codigo_puesto}",
+            "latitud": 4.0,
+            "longitud": -74.0,
+            "anio": 2022,
+            "corporacion": "senado",
+        },
+    )
+    assert create_resp.status_code == 201
+
+    list_resp = client.get(
+        "/api/v1/puestos",
+        params={
+            "municipio_codigo": query_codigo,
+            "limit": 100,
+        },
+    )
+    assert list_resp.status_code == 200
+    payload = list_resp.json()
+    assert payload["total"] == 1
+    assert payload["items"][0]["codigo_puesto"] == codigo_puesto
+
+
+@pytest.mark.parametrize(
+    ("departamento_codigo", "municipio_codigo", "departamento", "municipio", "query_codigo"),
+    [
+        ("25", "25001", "NORTE DE SAN", "CUCUTA", "54"),
+        ("31", "31001", "VALLE", "CALI", "76"),
+        ("56", "56001", "SAN ANDRES", "SAN ANDRES", "88"),
+    ],
+)
+def test_analytics_territorio_departamento_alias_truncado_fallback(
+    client: TestClient,
+    departamento_codigo: str,
+    municipio_codigo: str,
+    departamento: str,
+    municipio: str,
+    query_codigo: str,
+) -> None:
+    create_resp = client.post(
+        "/api/v1/puestos",
+        json={
+            "codigo_puesto": f"P-DEPT-{query_codigo}",
+            "departamento_codigo": departamento_codigo,
+            "municipio_codigo": municipio_codigo,
+            "departamento": departamento,
+            "municipio": municipio,
+            "puesto": f"Puesto {query_codigo}",
+            "mesas": 4,
+            "mujeres": 40,
+            "hombres": 60,
+            "total": 100,
+            "latitud": 4.0,
+            "longitud": -74.0,
+        },
+    )
+    assert create_resp.status_code == 201
+
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "departamento", "codigo": query_codigo},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["puestos_count"] == 1
+    assert payload["mesas_sum"] == 4
+    assert payload["mujeres_sum"] == 40
+    assert payload["hombres_sum"] == 60
+    assert payload["total_sum"] == 100
 
 
 def test_analytics_endpoint_original_no_alterado(client: TestClient) -> None:

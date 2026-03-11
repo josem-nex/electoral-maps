@@ -109,3 +109,30 @@ class PersonaORM(Base):
     )
 
     jurisdiccion = relationship("JurisdiccionORM")
+
+
+class TerritorioStatsCacheORM(Base):
+    __tablename__ = "territorio_stats_cache"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    tipo: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    codigo: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    nombre: Mapped[str | None] = mapped_column(String(128))
+    puestos_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    mesas_sum: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_sum: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    mujeres_sum: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    hombres_sum: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("tipo", "codigo", name="uq_territorio_stats_cache_tipo_codigo"),
+    )

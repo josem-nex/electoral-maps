@@ -253,7 +253,7 @@ export function ElectoralMap() {
   const [territorioStatsLoading, setTerritorioStatsLoading] = useState(false);
   const [territorioStatsError, setTerritorioStatsError] = useState(false);
   const [territorioTipo, setTerritorioTipo] = useState<
-    "departamento" | "municipio" | null
+    "pais" | "zona" | "departamento" | "municipio" | null
   >(null);
 
   const beginMapLoading = useCallback(() => {
@@ -581,19 +581,31 @@ export function ElectoralMap() {
     currentJurisdiccion?.layer,
   ]);
 
-  // Load aggregated territory statistics when a department or municipality is selected
+  // Load aggregated territory statistics for the active territorial layer
   useEffect(() => {
     const layer = currentJurisdiccion?.layer;
-    if (!layer || !["departamentos", "municipio"].includes(layer)) {
+    if (
+      !layer ||
+      !["pais", "zonas", "departamentos", "municipio"].includes(layer)
+    ) {
       setTerritorioStats(null);
       setTerritorioStatsError(false);
       return;
     }
 
-    let tipo: "departamento" | "municipio" | null = null;
+    let tipo: "pais" | "zona" | "departamento" | "municipio" | null = null;
     let codigo: string | null = null;
 
-    if (layer === "departamentos") {
+    if (layer === "pais") {
+      tipo = "pais";
+      codigo = "CO";
+    } else if (layer === "zonas") {
+      const zoneCode = currentJurisdiccion?.code?.trim();
+      if (zoneCode) {
+        tipo = "zona";
+        codigo = zoneCode;
+      }
+    } else if (layer === "departamentos") {
       if (selectedMunicipioCode) {
         tipo = "municipio";
         codigo = selectedMunicipioCode;
@@ -629,6 +641,7 @@ export function ElectoralMap() {
   }, [
     currentJurisdiccion?.layer,
     currentJurisdiccion?.id,
+    currentJurisdiccion?.code,
     selectedDepartmentCode,
     selectedMunicipioCode,
   ]);
@@ -922,7 +935,7 @@ export function ElectoralMap() {
           ["pais", "zonas"].includes(currentJurisdiccion.layer) &&
           filteredDepartamentosGeoJSON && (
             <GeoJSON
-              key={`depts-${currentJurisdiccion.id}`}
+              key={`depts-${currentJurisdiccion.id}-${zoneByDepartmentCode.size}`}
               data={filteredDepartamentosGeoJSON}
               style={getDepartmentStyle}
               onEachFeature={onEachFeature}

@@ -4,7 +4,7 @@ interface TeritorioStatsPanelProps {
   stats: TerritorioStats | null;
   loading: boolean;
   error: boolean;
-  tipo: "departamento" | "municipio" | null;
+  tipo: "pais" | "zona" | "departamento" | "municipio" | null;
   onClose: () => void;
 }
 
@@ -26,7 +26,14 @@ export function TeritorioStatsPanel({
 }: TeritorioStatsPanelProps) {
   if (!loading && !error && !stats) return null;
 
-  const tipoLabel = tipo === "departamento" ? "Departamento" : "Municipio";
+  const tipoLabel =
+    tipo === "pais"
+      ? "País"
+      : tipo === "zona"
+        ? "Zona"
+        : tipo === "departamento"
+          ? "Departamento"
+          : "Municipio";
 
   return (
     <div className="absolute top-4 right-4 z-[1000] bg-white rounded-xl shadow-xl w-72 max-h-[90vh] overflow-y-auto">
