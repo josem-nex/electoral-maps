@@ -15,6 +15,15 @@ import type { PuestoElectoral, TerritorioStats } from "../api/client";
 import type { Jurisdiccion } from "../stores/navigationStore";
 import { PuestoDetailPanel } from "./PuestoDetailPanel";
 import { TeritorioStatsPanel } from "./TeritorioStatsPanel";
+import {
+  departmentCodeFromFeature,
+  departmentNameFromFeature,
+  municipalityCodeFromFeature,
+  municipalityNameFromFeature,
+  normalizeDepartmentCode,
+  normalizeMunicipioCode,
+  type CanonicalTerritorySelection,
+} from "../utils/territory";
 
 // Fix for default marker icons in webpack
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -36,6 +45,7 @@ interface MapControllerProps {
   departmentGeoJSON: any;
   municipiosGeoJSON: any;
   isInDepartmentView: boolean;
+  isConsuladosDepartmentView: boolean;
   selectedZoneId: number | null;
   zoneByDepartmentCode: Map<string, ZonaGroup>;
 }
@@ -46,6 +56,16 @@ interface ZonaGroup {
   departmentCodes: string[];
 }
 
+interface ConsuladoMunicipioOption {
+  code: string;
+  name: string;
+  puestosCount: number;
+}
+
+const CONSULADOS_DEPARTMENT_CODE = "88";
+const CONSULADOS_VIEW_ID = "dept:88-consulados";
+const COLOMBIA_CENTER: [number, number] = [4.5709, -74.2973];
+
 const COLOMBIA_BOUNDS: [[number, number], [number, number]] = [
   [-4.4, -81.85],
   [13.6, -66.7],
@@ -53,49 +73,6 @@ const COLOMBIA_BOUNDS: [[number, number], [number, number]] = [
 
 function isLikelyColombiaCenter(lat: number, lng: number): boolean {
   return lat >= -6 && lat <= 15 && lng >= -83 && lng <= -65;
-}
-
-function normalizeDepartmentCode(value?: string): string | null {
-  if (!value) {
-    return null;
-  }
-  const digits = value.replace(/\D/g, "");
-  if (!digits) {
-    return null;
-  }
-  return digits.padStart(2, "0").slice(-2);
-}
-
-function normalizeMunicipioCode(value?: string): string | null {
-  if (!value) {
-    return null;
-  }
-  const digits = value.replace(/\D/g, "");
-  if (!digits) {
-    return null;
-  }
-  return digits.padStart(5, "0").slice(-5);
-}
-
-function municipioCodeFromFeature(feature: any): string | null {
-  const props = feature?.properties ?? {};
-
-  const fullCode =
-    props.MPIO_CDPMP ?? props.CODIGO_DANE ?? props.COD_DANE ?? props.MPIO;
-  const normalizedFullCode = normalizeMunicipioCode(String(fullCode ?? ""));
-  if (normalizedFullCode) {
-    return normalizedFullCode;
-  }
-
-  const deptCode = normalizeDepartmentCode(
-    String(props.DPTO_CCDGO ?? props.DPTO ?? ""),
-  );
-  const munDigits = String(props.MPIO_CCDGO ?? "").replace(/\D/g, "");
-  if (deptCode && munDigits) {
-    return `${deptCode}${munDigits.padStart(3, "0").slice(-3)}`;
-  }
-
-  return null;
 }
 
 function MapController({
@@ -106,17 +83,29 @@ function MapController({
   departmentGeoJSON,
   municipiosGeoJSON,
   isInDepartmentView,
+  isConsuladosDepartmentView,
   selectedZoneId,
   zoneByDepartmentCode,
 }: MapControllerProps) {
   const map = useMap();
 
   useEffect(() => {
+    if (isConsuladosDepartmentView) {
+      map.setView(center, zoom);
+      return;
+    }
     // Skip setView when a dept or municipality is selected — fitBounds handles
     // positioning in those cases, and having both animate causes conflicts.
     if (selectedMunicipioCode || selectedDepartmentCode) return;
     map.setView(center, zoom);
-  }, [center, zoom, selectedMunicipioCode, selectedDepartmentCode, map]);
+  }, [
+    center,
+    zoom,
+    selectedMunicipioCode,
+    selectedDepartmentCode,
+    isConsuladosDepartmentView,
+    map,
+  ]);
 
   // Handle maxBounds based on view mode
   useEffect(() => {
@@ -139,7 +128,10 @@ function MapController({
     if (!selectedZoneId || !departmentGeoJSON) return;
 
     const zoneFeatures = (departmentGeoJSON.features ?? []).filter((f: any) => {
-      const code = String(f?.properties?.DPTO ?? "").padStart(2, "0");
+      const code = departmentCodeFromFeature(f);
+      if (!code) {
+        return false;
+      }
       return zoneByDepartmentCode.get(code)?.id === selectedZoneId;
     });
     if (zoneFeatures.length === 0) return;
@@ -164,12 +156,12 @@ function MapController({
 
   // Handle automatic zoom when department is selected
   useEffect(() => {
+    if (isConsuladosDepartmentView) return;
     if (!selectedDepartmentCode || !departmentGeoJSON) return;
 
     const departmentFeature = departmentGeoJSON.features?.find(
       (feature: any) =>
-        String(feature?.properties?.DPTO ?? "").padStart(2, "0") ===
-        selectedDepartmentCode,
+        departmentCodeFromFeature(feature) === selectedDepartmentCode,
     );
 
     if (departmentFeature) {
@@ -194,7 +186,12 @@ function MapController({
         }, 400);
       }
     }
-  }, [selectedDepartmentCode, departmentGeoJSON, map]);
+  }, [
+    selectedDepartmentCode,
+    departmentGeoJSON,
+    isConsuladosDepartmentView,
+    map,
+  ]);
 
   // Handle automatic zoom when municipality is selected from search
   useEffect(() => {
@@ -202,7 +199,7 @@ function MapController({
 
     const municipioFeature = municipiosGeoJSON.features?.find(
       (feature: any) =>
-        municipioCodeFromFeature(feature) === selectedMunicipioCode,
+        municipalityCodeFromFeature(feature) === selectedMunicipioCode,
     );
 
     if (municipioFeature) {
@@ -234,6 +231,8 @@ export function ElectoralMap() {
   const {
     currentJurisdiccion,
     navigateTo,
+    navigateBack,
+    reset,
     selectedMunicipioCode,
     setSelectedMunicipioCode,
   } = useNavigationStore();
@@ -255,6 +254,11 @@ export function ElectoralMap() {
   const [territorioTipo, setTerritorioTipo] = useState<
     "pais" | "zona" | "departamento" | "municipio" | null
   >(null);
+  const [consuladoMunicipios, setConsuladoMunicipios] = useState<
+    ConsuladoMunicipioOption[]
+  >([]);
+  const [consuladoMunicipiosLoading, setConsuladoMunicipiosLoading] =
+    useState(false);
 
   const beginMapLoading = useCallback(() => {
     setLoadingCount((count) => count + 1);
@@ -283,6 +287,28 @@ export function ElectoralMap() {
     currentJurisdiccion?.layer === "departamentos"
       ? normalizeDepartmentCode(currentJurisdiccion.code)
       : null;
+  const isConsuladosDepartmentView =
+    currentJurisdiccion?.layer === "departamentos" &&
+    currentJurisdiccion.id === CONSULADOS_VIEW_ID;
+
+  const openConsuladosView = () => {
+    reset();
+    setSelectedMunicipioCode(null);
+    navigateTo({
+      id: CONSULADOS_VIEW_ID,
+      layer: "departamentos",
+      name: "Consulados",
+      code: CONSULADOS_DEPARTMENT_CODE,
+      center_lat: COLOMBIA_CENTER[0],
+      center_lon: COLOMBIA_CENTER[1],
+      zoom: 5.2,
+    });
+  };
+
+  const closeConsuladosView = () => {
+    setSelectedMunicipioCode(null);
+    navigateBack();
+  };
 
   const zonas = useMemo<ZonaGroup[]>(() => {
     const byZone = new Map<number, ZonaGroup>();
@@ -335,6 +361,173 @@ export function ElectoralMap() {
     return mapping;
   }, [zonas]);
 
+  const departmentFeatureByCode = useMemo(() => {
+    const mapping = new Map<string, any>();
+    for (const feature of departamentosGeoJSON?.features ?? []) {
+      const code = departmentCodeFromFeature(feature);
+      if (code) {
+        mapping.set(code, feature);
+      }
+    }
+    return mapping;
+  }, [departamentosGeoJSON]);
+
+  const departmentNameByCode = useMemo(() => {
+    const mapping = new Map<string, string>();
+    for (const [code, feature] of departmentFeatureByCode.entries()) {
+      const name = departmentNameFromFeature(feature);
+      if (name) {
+        mapping.set(code, name);
+      }
+    }
+    for (const dept of allDepartamentos) {
+      const code = normalizeDepartmentCode(dept.code);
+      const name = String(dept.name || "").trim();
+      if (code && name && !mapping.has(code)) {
+        mapping.set(code, name);
+      }
+    }
+
+    if (!mapping.has(CONSULADOS_DEPARTMENT_CODE)) {
+      mapping.set(CONSULADOS_DEPARTMENT_CODE, "CONSULADOS");
+    }
+
+    return mapping;
+  }, [allDepartamentos, departmentFeatureByCode]);
+
+  const municipioFeatureByCode = useMemo(() => {
+    const mapping = new Map<string, any>();
+    for (const feature of municipiosGeoJSON?.features ?? []) {
+      const code = municipalityCodeFromFeature(feature);
+      if (code) {
+        mapping.set(code, feature);
+      }
+    }
+    return mapping;
+  }, [municipiosGeoJSON]);
+
+  const municipioNameByCode = useMemo(() => {
+    const mapping = new Map<string, string>();
+    for (const [code, feature] of municipioFeatureByCode.entries()) {
+      const name = municipalityNameFromFeature(feature);
+      if (name) {
+        mapping.set(code, name);
+      }
+    }
+    for (const option of consuladoMunicipios) {
+      if (option.code && option.name && !mapping.has(option.code)) {
+        mapping.set(option.code, option.name);
+      }
+    }
+    if (currentJurisdiccion?.layer === "municipio") {
+      const currentMunicipioCode = normalizeMunicipioCode(
+        currentJurisdiccion.code,
+      );
+      const currentMunicipioName = String(
+        currentJurisdiccion.name || "",
+      ).trim();
+      if (
+        currentMunicipioCode &&
+        currentMunicipioName &&
+        !mapping.has(currentMunicipioCode)
+      ) {
+        mapping.set(currentMunicipioCode, currentMunicipioName);
+      }
+    }
+    return mapping;
+  }, [
+    consuladoMunicipios,
+    currentJurisdiccion?.code,
+    currentJurisdiccion?.layer,
+    currentJurisdiccion?.name,
+    municipioFeatureByCode,
+  ]);
+
+  const selectedTerritory = useMemo<CanonicalTerritorySelection | null>(() => {
+    if (currentJurisdiccion?.layer === "municipio") {
+      const canonicalId = normalizeMunicipioCode(currentJurisdiccion.code);
+      return canonicalId ? { level: "municipio", canonicalId } : null;
+    }
+    if (selectedMunicipioCode) {
+      return { level: "municipio", canonicalId: selectedMunicipioCode };
+    }
+    if (selectedDepartmentCode) {
+      return { level: "departamento", canonicalId: selectedDepartmentCode };
+    }
+    return null;
+  }, [
+    currentJurisdiccion?.code,
+    currentJurisdiccion?.layer,
+    selectedDepartmentCode,
+    selectedMunicipioCode,
+  ]);
+
+  const selectedTerritoryName = useMemo(() => {
+    if (!selectedTerritory) {
+      return null;
+    }
+    if (selectedTerritory.level === "departamento") {
+      return departmentNameByCode.get(selectedTerritory.canonicalId) ?? null;
+    }
+    return municipioNameByCode.get(selectedTerritory.canonicalId) ?? null;
+  }, [departmentNameByCode, municipioNameByCode, selectedTerritory]);
+
+  const selectedTerritoryIntegrityError = useMemo(() => {
+    if (!selectedTerritory) {
+      return false;
+    }
+    if (selectedTerritory.level === "departamento") {
+      return !departmentNameByCode.has(selectedTerritory.canonicalId);
+    }
+    return !municipioNameByCode.has(selectedTerritory.canonicalId);
+  }, [departmentNameByCode, municipioNameByCode, selectedTerritory]);
+
+  useEffect(() => {
+    if (!selectedTerritory || !selectedTerritoryIntegrityError) {
+      return;
+    }
+    console.error(
+      "Territorial integrity error: unresolved canonical selection",
+      selectedTerritory,
+    );
+  }, [selectedTerritory, selectedTerritoryIntegrityError]);
+
+  const selectedPuestoTerritory = useMemo(() => {
+    if (!selectedPuesto) {
+      return null;
+    }
+
+    const municipioCode =
+      selectedTerritory?.level === "municipio"
+        ? selectedTerritory.canonicalId
+        : normalizeMunicipioCode(selectedPuesto.municipio_codigo);
+    const departamentoCode =
+      selectedTerritory?.level === "departamento"
+        ? selectedTerritory.canonicalId
+        : (normalizeDepartmentCode(selectedPuesto.departamento_codigo) ??
+          (municipioCode ? municipioCode.slice(0, 2) : null));
+
+    const municipio = municipioCode
+      ? (municipioNameByCode.get(municipioCode) ?? null)
+      : null;
+    const departamento = departamentoCode
+      ? (departmentNameByCode.get(departamentoCode) ?? null)
+      : null;
+
+    return {
+      municipio,
+      departamento,
+      integrityError: Boolean(
+        (municipioCode && !municipio) || (departamentoCode && !departamento),
+      ),
+    };
+  }, [
+    departmentNameByCode,
+    municipioNameByCode,
+    selectedPuesto,
+    selectedTerritory,
+  ]);
+
   const filteredDepartamentosGeoJSON = useMemo(() => {
     if (!departamentosGeoJSON) {
       return null;
@@ -345,7 +538,10 @@ export function ElectoralMap() {
 
     if (currentJurisdiccion?.layer === "zonas" && selectedZoneId !== null) {
       filteredFeatures = allFeatures.filter((feature: any) => {
-        const code = String(feature?.properties?.DPTO ?? "").padStart(2, "0");
+        const code = departmentCodeFromFeature(feature);
+        if (!code) {
+          return false;
+        }
         return zoneByDepartmentCode.get(code)?.id === selectedZoneId;
       });
     }
@@ -356,8 +552,7 @@ export function ElectoralMap() {
     ) {
       filteredFeatures = allFeatures.filter(
         (feature: any) =>
-          String(feature?.properties?.DPTO ?? "").padStart(2, "0") ===
-          selectedDepartmentCode,
+          departmentCodeFromFeature(feature) === selectedDepartmentCode,
       );
     }
 
@@ -448,6 +643,14 @@ export function ElectoralMap() {
           }
           return;
         } else if (currentJurisdiccion.layer === "departamentos") {
+          if (isConsuladosDepartmentView) {
+            if (isActive) {
+              setMunicipiosGeoJSON(null);
+              setPuestos([]);
+            }
+            return;
+          }
+
           shouldTrackLoading = true;
           beginMapLoading();
 
@@ -550,6 +753,83 @@ export function ElectoralMap() {
     endMapLoading,
   ]);
 
+  useEffect(() => {
+    if (!isConsuladosDepartmentView) {
+      setConsuladoMunicipios([]);
+      return;
+    }
+
+    let isActive = true;
+    setConsuladoMunicipiosLoading(true);
+
+    api
+      .getPuestos({
+        departamento_codigo: CONSULADOS_DEPARTMENT_CODE,
+        limit: 2500,
+      })
+      .then((rows) => {
+        if (!isActive) {
+          return;
+        }
+
+        const byMunicipio = new Map<string, ConsuladoMunicipioOption>();
+        for (const row of rows) {
+          const municipioCode = normalizeMunicipioCode(row.municipio_codigo);
+          if (
+            !municipioCode ||
+            !municipioCode.startsWith(CONSULADOS_DEPARTMENT_CODE)
+          ) {
+            continue;
+          }
+
+          const municipioName =
+            String(row.municipio || "").trim() || municipioCode;
+          const existing = byMunicipio.get(municipioCode);
+          if (!existing) {
+            byMunicipio.set(municipioCode, {
+              code: municipioCode,
+              name: municipioName,
+              puestosCount: 1,
+            });
+          } else {
+            existing.puestosCount += 1;
+          }
+        }
+
+        const options = Array.from(byMunicipio.values()).sort((a, b) =>
+          a.name.localeCompare(b.name, "es", { sensitivity: "base" }),
+        );
+
+        setConsuladoMunicipios(options);
+
+        if (
+          selectedMunicipioCode &&
+          !options.some((option) => option.code === selectedMunicipioCode)
+        ) {
+          setSelectedMunicipioCode(null);
+        }
+      })
+      .catch((error) => {
+        console.error("Error loading consulados municipalities:", error);
+        if (isActive) {
+          setConsuladoMunicipios([]);
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setConsuladoMunicipiosLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    isConsuladosDepartmentView,
+    selectedMunicipioCode,
+    setSelectedMunicipioCode,
+  ]);
+
   // Update municipality styles imperatively when selection changes (avoids remounting)
   useEffect(() => {
     const layer = municipiosLayerRef.current as any;
@@ -561,6 +841,11 @@ export function ElectoralMap() {
   // Load puestos when a municipio is selected from department view or search bar
   useEffect(() => {
     if (currentJurisdiccion?.layer !== "departamentos") return;
+    if (isConsuladosDepartmentView) {
+      setPuestos([]);
+      setSelectedPuesto(null);
+      return;
+    }
     if (!selectedMunicipioCode) {
       setPuestos([]);
       setSelectedPuesto(null);
@@ -578,6 +863,7 @@ export function ElectoralMap() {
   }, [
     selectedMunicipioCode,
     selectedDepartmentCode,
+    isConsuladosDepartmentView,
     currentJurisdiccion?.layer,
   ]);
 
@@ -647,8 +933,19 @@ export function ElectoralMap() {
   ]);
 
   const handleDepartmentClick = (feature: any) => {
-    const deptCode = String(feature.properties.DPTO).padStart(2, "0");
-    const deptName = feature.properties.NOMBRE_DPT;
+    const deptCode = departmentCodeFromFeature(feature);
+    const deptName =
+      (deptCode ? departmentNameByCode.get(deptCode) : null) ??
+      departmentNameFromFeature(feature) ??
+      "Departamento";
+
+    if (!deptCode) {
+      console.error(
+        "Territorial integrity error: department feature without canonical ID",
+        feature,
+      );
+      return;
+    }
 
     if (
       currentJurisdiccion?.layer === "departamentos" &&
@@ -680,7 +977,14 @@ export function ElectoralMap() {
   };
 
   const handleZoneClick = (feature: any) => {
-    const deptCode = String(feature?.properties?.DPTO ?? "").padStart(2, "0");
+    const deptCode = departmentCodeFromFeature(feature);
+    if (!deptCode) {
+      console.error(
+        "Territorial integrity error: zone feature without canonical department ID",
+        feature,
+      );
+      return;
+    }
     const zone = zoneByDepartmentCode.get(deptCode);
     if (!zone) {
       return;
@@ -688,9 +992,7 @@ export function ElectoralMap() {
 
     const zoneFeatures = (departamentosGeoJSON?.features ?? []).filter(
       (f: any) =>
-        zone.departmentCodes.includes(
-          String(f?.properties?.DPTO ?? "").padStart(2, "0"),
-        ),
+        zone.departmentCodes.includes(departmentCodeFromFeature(f) ?? ""),
     );
     if (zoneFeatures.length === 0) {
       return;
@@ -743,7 +1045,17 @@ export function ElectoralMap() {
   };
 
   const getDepartmentStyle = (feature: any): L.PathOptions => {
-    const deptCode = String(feature?.properties?.DPTO ?? "").padStart(2, "0");
+    const deptCode = departmentCodeFromFeature(feature);
+
+    if (!deptCode) {
+      return {
+        color: "#1d4ed8",
+        weight: 2.4,
+        opacity: 0.95,
+        fillColor: "#93c5fd",
+        fillOpacity: 0.12,
+      };
+    }
 
     if (currentJurisdiccion?.layer !== "departamentos") {
       return zoneStyleForDepartment(deptCode);
@@ -771,8 +1083,8 @@ export function ElectoralMap() {
   };
 
   const onEachFeature = (feature: any, layer: any) => {
-    const deptCode = String(feature?.properties?.DPTO ?? "").padStart(2, "0");
-    const zone = zoneByDepartmentCode.get(deptCode);
+    const deptCode = departmentCodeFromFeature(feature);
+    const zone = deptCode ? zoneByDepartmentCode.get(deptCode) : undefined;
     const currentLayer = currentJurisdiccion?.layer;
 
     layer.on({
@@ -797,8 +1109,10 @@ export function ElectoralMap() {
 
     const tooltipText =
       currentLayer === "pais" && zone
-        ? `${zone.name} • ${feature.properties.NOMBRE_DPT}`
-        : feature.properties.NOMBRE_DPT;
+        ? `${zone.name} • ${(deptCode ? departmentNameByCode.get(deptCode) : null) ?? departmentNameFromFeature(feature) ?? "Departamento"}`
+        : ((deptCode ? departmentNameByCode.get(deptCode) : null) ??
+          departmentNameFromFeature(feature) ??
+          "Departamento");
 
     layer.bindTooltip(tooltipText, {
       permanent: false,
@@ -807,10 +1121,10 @@ export function ElectoralMap() {
   };
 
   const onEachMunicipioFeature = (feature: any, layer: any) => {
+    const featureCode = municipalityCodeFromFeature(feature);
     const nombreMunicipio =
-      feature.properties?.MPIO_CNMBR ||
-      feature.properties?.NOMBRE_MPI ||
-      feature.properties?.nombre;
+      (featureCode ? municipioNameByCode.get(featureCode) : null) ??
+      municipalityNameFromFeature(feature);
 
     if (nombreMunicipio) {
       layer.bindTooltip(nombreMunicipio, {
@@ -824,13 +1138,18 @@ export function ElectoralMap() {
 
     layer.on({
       click: () => {
-        const featureCode = municipioCodeFromFeature(feature);
+        const featureCode = municipalityCodeFromFeature(feature);
         if (featureCode) {
           setSelectedMunicipioCode(featureCode);
+        } else {
+          console.error(
+            "Territorial integrity error: municipality feature without canonical ID",
+            feature,
+          );
         }
       },
       mouseover: (e: any) => {
-        const featureCode = municipioCodeFromFeature(feature);
+        const featureCode = municipalityCodeFromFeature(feature);
         const isSelected =
           selectedMunicipioCodeRef.current &&
           featureCode === selectedMunicipioCodeRef.current;
@@ -839,7 +1158,7 @@ export function ElectoralMap() {
         }
       },
       mouseout: (e: any) => {
-        const featureCode = municipioCodeFromFeature(feature);
+        const featureCode = municipalityCodeFromFeature(feature);
         const isSelected =
           selectedMunicipioCodeRef.current &&
           featureCode === selectedMunicipioCodeRef.current;
@@ -865,7 +1184,7 @@ export function ElectoralMap() {
   };
 
   const municipioStyle = (feature: any): L.PathOptions => {
-    const featureCode = municipioCodeFromFeature(feature);
+    const featureCode = municipalityCodeFromFeature(feature);
     const isSelected =
       selectedMunicipioCode && featureCode === selectedMunicipioCode;
 
@@ -890,6 +1209,69 @@ export function ElectoralMap() {
 
   return (
     <div className="relative w-full h-full">
+      <div className="absolute top-4 left-20 z-[1000]">
+        {!isConsuladosDepartmentView ? (
+          <button
+            onClick={openConsuladosView}
+            className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50"
+          >
+            Ver Consulados
+          </button>
+        ) : (
+          <div className="w-80 rounded-xl border border-blue-100 bg-white p-3 shadow-lg">
+            <div className="mb-2 flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-blue-600">
+                  Departamento especial
+                </p>
+                <p className="text-sm font-semibold text-slate-800">
+                  Consulados (88)
+                </p>
+              </div>
+              <button
+                onClick={closeConsuladosView}
+                className="text-xs font-medium text-blue-700 hover:text-blue-900"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <label className="mb-1 block text-xs font-medium text-slate-600">
+              País (municipio)
+            </label>
+            <select
+              value={selectedMunicipioCode ?? ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                setSelectedMunicipioCode(value || null);
+              }}
+              className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-700"
+              disabled={consuladoMunicipiosLoading}
+            >
+              <option value="">Todos los consulados</option>
+              {consuladoMunicipios.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.name} ({option.puestosCount} puestos)
+                </option>
+              ))}
+            </select>
+
+            {consuladoMunicipiosLoading && (
+              <p className="mt-2 text-xs text-slate-500">
+                Cargando países de consulados…
+              </p>
+            )}
+
+            {!consuladoMunicipiosLoading &&
+              consuladoMunicipios.length === 0 && (
+                <p className="mt-2 text-xs text-slate-500">
+                  No hay municipios de consulados disponibles.
+                </p>
+              )}
+          </div>
+        )}
+      </div>
+
       {loading && (
         <div className="absolute top-4 right-4 z-[1000] pointer-events-none">
           <div className="flex items-center gap-3 rounded-full border border-blue-100 bg-white/95 px-4 py-2 shadow-lg backdrop-blur-sm">
@@ -921,6 +1303,7 @@ export function ElectoralMap() {
           departmentGeoJSON={departamentosGeoJSON}
           municipiosGeoJSON={municipiosGeoJSON}
           isInDepartmentView={currentJurisdiccion?.layer === "departamentos"}
+          isConsuladosDepartmentView={isConsuladosDepartmentView}
           selectedZoneId={selectedZoneId}
           zoneByDepartmentCode={zoneByDepartmentCode}
         />
@@ -999,6 +1382,7 @@ export function ElectoralMap() {
 
       <PuestoDetailPanel
         puesto={selectedPuesto}
+        territoryContext={selectedPuestoTerritory}
         onClose={() => setSelectedPuesto(null)}
       />
 
@@ -1009,6 +1393,9 @@ export function ElectoralMap() {
           loading={territorioStatsLoading}
           error={territorioStatsError}
           tipo={territorioTipo}
+          displayName={selectedTerritoryName}
+          displayCode={selectedTerritory?.canonicalId ?? null}
+          integrityError={selectedTerritoryIntegrityError}
           onClose={() => {
             setTerritorioStats(null);
             setTerritorioStatsError(false);

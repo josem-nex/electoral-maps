@@ -39,5 +39,30 @@ class Settings(BaseSettings):
                 return [str(origin).strip() for origin in parsed if str(origin).strip()]
 
         return [origin.strip() for origin in raw_value.split(",") if origin.strip()]
+
+    @field_validator("data_dir", mode="before")
+    @classmethod
+    def resolve_data_dir(cls, value: Any) -> Path:
+        backend_dir = Path(__file__).resolve().parents[1]
+        default_data_dir = backend_dir.parent / "data"
+
+        if value is None:
+            return default_data_dir
+
+        raw_value = str(value).strip()
+        if not raw_value:
+            return default_data_dir
+
+        data_path = Path(raw_value).expanduser()
+        if not data_path.is_absolute():
+            data_path = (backend_dir / data_path).resolve()
+
+        if data_path.exists():
+            return data_path
+
+        if default_data_dir.exists():
+            return default_data_dir
+
+        return data_path
     
 settings = Settings()

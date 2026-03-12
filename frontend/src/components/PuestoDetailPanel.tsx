@@ -1,12 +1,28 @@
 import type { PuestoElectoral } from "../api/client";
 
+interface PuestoTerritoryContext {
+  municipio: string | null;
+  departamento: string | null;
+  integrityError: boolean;
+}
+
 interface PuestoDetailPanelProps {
   puesto: PuestoElectoral | null;
+  territoryContext?: PuestoTerritoryContext | null;
   onClose: () => void;
 }
 
-export function PuestoDetailPanel({ puesto, onClose }: PuestoDetailPanelProps) {
+export function PuestoDetailPanel({
+  puesto,
+  territoryContext,
+  onClose,
+}: PuestoDetailPanelProps) {
   if (!puesto) return null;
+
+  const resolvedMunicipio = territoryContext?.municipio ?? puesto.municipio;
+  const resolvedDepartamento =
+    territoryContext?.departamento ?? puesto.departamento;
+  const hasTerritoryIntegrityError = Boolean(territoryContext?.integrityError);
 
   return (
     <>
@@ -72,6 +88,12 @@ export function PuestoDetailPanel({ puesto, onClose }: PuestoDetailPanelProps) {
             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
               Ubicación Territorial
             </h4>
+            {hasTerritoryIntegrityError && (
+              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Error de integridad territorial: no fue posible resolver la
+                etiqueta canónica del territorio seleccionado.
+              </div>
+            )}
             <div className="space-y-2">
               <div className="flex items-start">
                 <svg
@@ -96,9 +118,11 @@ export function PuestoDetailPanel({ puesto, onClose }: PuestoDetailPanelProps) {
                 </svg>
                 <div>
                   <p className="text-sm font-medium text-gray-900">
-                    {puesto.municipio}
+                    {resolvedMunicipio}
                   </p>
-                  <p className="text-xs text-gray-500">{puesto.departamento}</p>
+                  <p className="text-xs text-gray-500">
+                    {resolvedDepartamento}
+                  </p>
                 </div>
               </div>
 

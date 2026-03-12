@@ -502,6 +502,18 @@ def test_search_persona_y_analytics(client: TestClient) -> None:
     assert analytics_payload["datos"]["mesas"] == 2
 
 
+def test_search_geo_departamento_por_subcadena_nombre_comun(client: TestClient) -> None:
+    resp = client.get(
+        "/api/v1/search",
+        params={"query": "san andres", "types": "geo", "limit": 20},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+
+    dept_results = [item for item in payload["items"] if item["type"] == "departamento"]
+    assert any(item["geo_code"] == "56" for item in dept_results)
+
+
 def _create_puestos_for_territorio(client: TestClient) -> None:
     """Seed two puestos in Antioquia / Medellín for analytics territory tests."""
     for codigo, mujeres, hombres, total, mesas in [
@@ -528,6 +540,27 @@ def _create_puestos_for_territorio(client: TestClient) -> None:
         assert resp.status_code == 201
 
 
+def _create_puesto_consulado(client: TestClient) -> None:
+    resp = client.post(
+        "/api/v1/puestos",
+        json={
+            "codigo_puesto": "CONSUL-001",
+            "departamento_codigo": "88",
+            "municipio_codigo": "88815",
+            "departamento": "CONSULADOS",
+            "municipio": "VENEZUELA",
+            "puesto": "Consulado Caracas",
+            "mujeres": 40,
+            "hombres": 60,
+            "total": 100,
+            "mesas": 2,
+            "latitud": 4.0,
+            "longitud": -74.0,
+        },
+    )
+    assert resp.status_code == 201
+
+
 def test_analytics_territorio_departamento_valido(client: TestClient) -> None:
     _create_hierarchy(client)
     _create_puestos_for_territorio(client)
@@ -546,6 +579,46 @@ def test_analytics_territorio_departamento_valido(client: TestClient) -> None:
     assert payload["total_sum"] == 390     # 220 + 170
     assert payload["mujeres_sum"] == 180   # 100 + 80
     assert payload["hombres_sum"] == 210   # 120 + 90
+
+
+def test_analytics_territorio_departamento_especial_consulados_nombre_fallback(
+    client: TestClient,
+) -> None:
+    _create_puesto_consulado(client)
+
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "departamento", "codigo": "88"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+
+    assert payload["tipo"] == "departamento"
+    assert payload["codigo"] == "88"
+    assert payload["nombre"] == "CONSULADOS"
+    assert payload["puestos_count"] == 1
+    assert payload["mesas_sum"] == 2
+    assert payload["total_sum"] == 100
+
+
+def test_analytics_territorio_municipio_especial_consulados_nombre_fallback(
+    client: TestClient,
+) -> None:
+    _create_puesto_consulado(client)
+
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "municipio", "codigo": "88815"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+
+    assert payload["tipo"] == "municipio"
+    assert payload["codigo"] == "88815"
+    assert payload["nombre"] == "VENEZUELA"
+    assert payload["puestos_count"] == 1
+    assert payload["mesas_sum"] == 2
+    assert payload["total_sum"] == 100
 
 
 def test_analytics_territorio_municipio_valido(client: TestClient) -> None:
@@ -582,6 +655,25 @@ def test_analytics_territorio_pais_valido(client: TestClient) -> None:
     assert payload["nombre"] == "Colombia"
     assert payload["puestos_count"] == 2
     assert payload["mesas_sum"] == 9
+
+
+def test_analytics_territorio_pais_incluye_departamento_consulados(client: TestClient) -> None:
+    _create_hierarchy(client)
+    _create_puestos_for_territorio(client)
+    _create_puesto_consulado(client)
+
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "pais", "codigo": "CO"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+
+    assert payload["puestos_count"] == 3
+    assert payload["mesas_sum"] == 11
+    assert payload["total_sum"] == 490
+    assert payload["mujeres_sum"] == 220
+    assert payload["hombres_sum"] == 270
 
 
 def test_analytics_territorio_zona_valido(client: TestClient) -> None:
@@ -631,6 +723,49 @@ def test_analytics_territorio_cache_persistente(client: TestClient) -> None:
     )
     assert second_resp.status_code == 200
     assert second_resp.json()["puestos_count"] == 2
+
+
+def test_analytics_territorio_cache_viejo_consulados_se_autocorrige(
+    client: TestClient,
+) -> None:
+    _create_puesto_consulado(client)
+
+    with app.state.testing_session_local() as db:
+        db.add(
+            TerritorioStatsCacheORM(
+                tipo="departamento",
+                codigo="88",
+                nombre="ARCHIPIÉLAGO DE SAN ANDRÉS, PROVIDENCIA Y SANTA CATALINA",
+                puestos_count=99,
+                mesas_sum=999,
+                total_sum=9999,
+                mujeres_sum=5000,
+                hombres_sum=4999,
+            )
+        )
+        db.commit()
+
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "departamento", "codigo": "88"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+
+    assert payload["nombre"] == "CONSULADOS"
+    assert payload["puestos_count"] == 1
+    assert payload["mesas_sum"] == 2
+    assert payload["total_sum"] == 100
+
+    with app.state.testing_session_local() as db:
+        cached = db.query(TerritorioStatsCacheORM).filter_by(
+            tipo="departamento",
+            codigo="88",
+        ).first()
+        assert cached is not None
+        assert cached.nombre == "CONSULADOS"
+        assert cached.puestos_count == 1
+        assert cached.mesas_sum == 2
 
 
 def test_analytics_territorio_sin_puestos_devuelve_ceros(client: TestClient) -> None:
@@ -739,6 +874,165 @@ def test_analytics_territorio_departamento_nombre_fallback(client: TestClient) -
     assert payload["mesas_sum"] == 6
     assert payload["mujeres_sum"] == 100
     assert payload["hombres_sum"] == 120
+
+
+def test_analytics_territorio_departamento_ignora_codigo_exacto_con_nombre_conflictivo(
+    client: TestClient,
+) -> None:
+    """Antioquia MUST NOT inherit Bolívar labels/data from contaminated exact-code rows."""
+    wrong_resp = client.post(
+        "/api/v1/puestos",
+        json={
+            "codigo_puesto": "P-DEPT-WRONG-05",
+            "departamento_codigo": "05",
+            "municipio_codigo": "05001",
+            "departamento": "BOLIVAR",
+            "municipio": "CARTAGENA",
+            "puesto": "Puesto conflictivo",
+            "mesas": 8,
+            "mujeres": 80,
+            "hombres": 90,
+            "total": 170,
+            "latitud": 10.4,
+            "longitud": -75.5,
+        },
+    )
+    assert wrong_resp.status_code == 201
+
+    right_resp = client.post(
+        "/api/v1/puestos",
+        json={
+            "codigo_puesto": "P-DEPT-RIGHT-FALLBACK",
+            "departamento_codigo": "01",
+            "municipio_codigo": "01001",
+            "departamento": "ANTIOQUIA",
+            "municipio": "MEDELLIN",
+            "puesto": "Puesto correcto",
+            "mesas": 3,
+            "mujeres": 30,
+            "hombres": 40,
+            "total": 70,
+            "latitud": 6.24,
+            "longitud": -75.58,
+        },
+    )
+    assert right_resp.status_code == 201
+
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "departamento", "codigo": "05"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["codigo"] == "05"
+    assert payload["nombre"] == "ANTIOQUIA"
+    assert payload["puestos_count"] == 1
+    assert payload["mesas_sum"] == 3
+    assert payload["total_sum"] == 70
+
+
+def test_analytics_territorio_municipio_ignora_codigo_exacto_con_nombre_conflictivo(
+    client: TestClient,
+) -> None:
+    """Medellín MUST NOT inherit Cartagena labels/data from contaminated exact-code rows."""
+    wrong_resp = client.post(
+        "/api/v1/puestos",
+        json={
+            "codigo_puesto": "P-MUN-WRONG-05001",
+            "departamento_codigo": "05",
+            "municipio_codigo": "05001",
+            "departamento": "BOLIVAR",
+            "municipio": "CARTAGENA",
+            "puesto": "Puesto conflictivo",
+            "mesas": 5,
+            "mujeres": 50,
+            "hombres": 60,
+            "total": 110,
+            "latitud": 10.4,
+            "longitud": -75.5,
+        },
+    )
+    assert wrong_resp.status_code == 201
+
+    right_resp = client.post(
+        "/api/v1/puestos",
+        json={
+            "codigo_puesto": "P-MUN-RIGHT-FALLBACK",
+            "departamento_codigo": "01",
+            "municipio_codigo": "01001",
+            "departamento": "ANTIOQUIA",
+            "municipio": "MEDELLIN",
+            "puesto": "Puesto correcto",
+            "mesas": 2,
+            "mujeres": 20,
+            "hombres": 25,
+            "total": 45,
+            "latitud": 6.24,
+            "longitud": -75.58,
+        },
+    )
+    assert right_resp.status_code == 201
+
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "municipio", "codigo": "05001"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["codigo"] == "05001"
+    assert payload["nombre"] == "MEDELLÍN"
+    assert payload["puestos_count"] == 1
+    assert payload["mesas_sum"] == 2
+    assert payload["total_sum"] == 45
+
+
+def test_geojson_municipios_incluye_llaves_canonicas(client: TestClient) -> None:
+    resp = client.get(
+        "/api/v1/geojson/municipios",
+        params={"departamento_codigo": "05"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["type"] == "FeatureCollection"
+    assert payload["features"]
+
+    medellin = next(
+        feature
+        for feature in payload["features"]
+        if feature["properties"].get("municipio_codigo") == "05001"
+    )
+    props = medellin["properties"]
+    assert props["canonical_id"] == "05001"
+    assert props["departamento_codigo"] == "05"
+    assert props["municipio_codigo"] == "05001"
+    assert props["municipio_nombre"] == "MEDELLÍN"
+
+
+def test_geojson_departamento_archipielago_queda_en_codigo_56(client: TestClient) -> None:
+    resp = client.get("/api/v1/geojson/departamentos")
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["type"] == "FeatureCollection"
+
+    san_andres = next(
+        feature
+        for feature in payload["features"]
+        if "SAN ANDR" in str(feature["properties"].get("departamento_nombre", "")).upper()
+    )
+    props = san_andres["properties"]
+    assert props["canonical_id"] == "56"
+    assert props["departamento_codigo"] == "56"
+
+
+def test_geojson_municipios_codigo_88_no_devuelve_archipielago(client: TestClient) -> None:
+    resp = client.get(
+        "/api/v1/geojson/municipios",
+        params={"departamento_codigo": "88"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["type"] == "FeatureCollection"
+    assert payload["features"] == []
 
 
 def test_puestos_municipio_nombre_largo_vs_corto_fallback(client: TestClient) -> None:
@@ -871,7 +1165,7 @@ def test_puestos_municipio_variantes_historicas_fallback(
     [
         ("25", "25001", "NORTE DE SAN", "CUCUTA", "54"),
         ("31", "31001", "VALLE", "CALI", "76"),
-        ("56", "56001", "SAN ANDRES", "SAN ANDRES", "88"),
+        ("56", "56001", "SAN ANDRES", "SAN ANDRES", "56"),
     ],
 )
 def test_analytics_territorio_departamento_alias_truncado_fallback(

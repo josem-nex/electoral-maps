@@ -12,6 +12,7 @@ from app.data_loader import build_departamentos_catalog, build_municipios_catalo
 from app.db_models import PuestoORM, TerritorioStatsCacheORM
 
 VALID_TERRITORIO_TIPOS = {"pais", "zona", "departamento", "municipio"}
+SPECIAL_DEPARTAMENTO_CODES_ALLOW_EXACT_FALLBACK = {"88"}
 MUNICIPIO_NOISE_TOKENS = {
     "DE",
     "DEL",
@@ -232,16 +233,28 @@ def compute_territorio_analytics(
     if tipo == "departamento":
         nombre = departamento_name_by_code().get(codigo)
         nombre_norm = _normalize_text(nombre) if nombre else None
+        exact_rows = db.query(PuestoORM).filter(PuestoORM.departamento_codigo == codigo).all()
+        used_special_exact_fallback = False
 
-        rows = db.query(PuestoORM).filter(PuestoORM.departamento_codigo == codigo).all()
-        if rows and nombre_norm:
-            matched = [r for r in rows if _normalize_text(r.departamento) == nombre_norm]
-            rows = matched if matched else []
-
-        if not rows and nombre_norm:
-            rows = [
-                r for r in db.query(PuestoORM).all() if _normalize_text(r.departamento) == nombre_norm
+        if nombre_norm:
+            matched_exact_rows = [
+                r for r in exact_rows if _normalize_text(r.departamento) == nombre_norm
             ]
+            if matched_exact_rows:
+                rows = matched_exact_rows
+            else:
+                rows = [
+                    r for r in db.query(PuestoORM).all() if _normalize_text(r.departamento) == nombre_norm
+                ]
+                if not rows and codigo in SPECIAL_DEPARTAMENTO_CODES_ALLOW_EXACT_FALLBACK:
+                    rows = exact_rows
+                    used_special_exact_fallback = bool(rows)
+        else:
+            rows = exact_rows
+
+        if (not nombre or used_special_exact_fallback) and rows:
+            fallback_nombre = str(rows[0].departamento or "").strip()
+            nombre = fallback_nombre or None
 
         return {
             "tipo": "departamento",
@@ -261,12 +274,19 @@ def compute_territorio_analytics(
             return False
         return True
 
-    rows = db.query(PuestoORM).filter(PuestoORM.municipio_codigo == codigo).all()
-    if rows and nombre:
-        rows = [r for r in rows if _mun_matches(r)]
+    exact_rows = db.query(PuestoORM).filter(PuestoORM.municipio_codigo == codigo).all()
+    if nombre:
+        matched_exact_rows = [r for r in exact_rows if _mun_matches(r)]
+        if matched_exact_rows:
+            rows = matched_exact_rows
+        else:
+            rows = [r for r in db.query(PuestoORM).all() if _mun_matches(r)]
+    else:
+        rows = exact_rows
 
-    if not rows and nombre:
-        rows = [r for r in db.query(PuestoORM).all() if _mun_matches(r)]
+    if not nombre and rows:
+        fallback_nombre = str(rows[0].municipio or "").strip()
+        nombre = fallback_nombre or None
 
     return {
         "tipo": "municipio",
@@ -329,16 +349,27 @@ def refresh_territorio_stats_cache(
     zone_ids = sorted({int(dept.zone_id or 0) for dept in departamentos})
     targets.extend([("zona", str(zone_id)) for zone_id in zone_ids])
 
-    dept_codes = sorted(departamento_name_by_code().keys())
-    targets.extend([("departamento", code) for code in dept_codes])
-
-    municipio_codes = sorted(
+    dept_codes = sorted(
         {
-            str(municipio.code).strip().zfill(5)
-            for municipio in build_municipios_catalog()
-            if municipio.code
+            code
+            for code in (set(departamento_name_by_code().keys()) | set(summaries_by_departamento_codigo.keys()))
+            if re.fullmatch(r"\d{2}", str(code))
         }
     )
+    targets.extend([("departamento", code) for code in dept_codes])
+
+    municipio_codes = sorted({
+        code
+        for code in (
+            {
+                str(municipio.code).strip().zfill(5)
+                for municipio in build_municipios_catalog()
+                if municipio.code
+            }
+            | set(summaries_by_municipio_codigo.keys())
+        )
+        if re.fullmatch(r"\d{5}", str(code))
+    })
     targets.extend([("municipio", code) for code in municipio_codes])
 
     for tipo, codigo in targets:
@@ -382,14 +413,32 @@ def refresh_territorio_stats_cache(
         elif tipo == "departamento":
             nombre = departamento_name_by_code().get(codigo)
             nombre_norm = _normalize_text(nombre) if nombre else None
+            exact_dept_rows = summaries_by_departamento_codigo.get(codigo, [])
+            used_special_exact_fallback = False
 
-            dept_rows = summaries_by_departamento_codigo.get(codigo, [])
-            if dept_rows and nombre_norm:
-                matched = [r for r in dept_rows if _normalize_text(r["departamento"]) == nombre_norm]
-                dept_rows = matched if matched else []
+            if nombre_norm:
+                matched = [
+                    r for r in exact_dept_rows if _normalize_text(r["departamento"]) == nombre_norm
+                ]
+                if matched:
+                    dept_rows = matched
+                else:
+                    dept_rows = summaries_by_departamento_norm.get(nombre_norm, [])
+                    if (
+                        not dept_rows
+                        and codigo in SPECIAL_DEPARTAMENTO_CODES_ALLOW_EXACT_FALLBACK
+                    ):
+                        dept_rows = exact_dept_rows
+                        used_special_exact_fallback = bool(dept_rows)
+            else:
+                dept_rows = exact_dept_rows
 
-            if not dept_rows and nombre_norm:
-                dept_rows = summaries_by_departamento_norm.get(nombre_norm, [])
+            if (not nombre or used_special_exact_fallback) and dept_rows:
+                fallback_nombre = next(
+                    (str(row.get("departamento") or "").strip() for row in dept_rows if str(row.get("departamento") or "").strip()),
+                    "",
+                )
+                nombre = fallback_nombre or None
 
             payload = {
                 "tipo": "departamento",
@@ -409,9 +458,21 @@ def refresh_territorio_stats_cache(
                     return False
                 return True
 
-            mun_rows = summaries_by_municipio_codigo.get(codigo, [])
-            if mun_rows and nombre:
-                mun_rows = [row for row in mun_rows if _summary_matches(row)]
+            exact_mun_rows = summaries_by_municipio_codigo.get(codigo, [])
+            if nombre:
+                matched = [row for row in exact_mun_rows if _summary_matches(row)]
+                if matched:
+                    mun_rows = matched
+                elif dept_norm:
+                    mun_rows = [
+                        row
+                        for row in summaries_by_departamento_norm.get(dept_norm, [])
+                        if _summary_matches(row)
+                    ]
+                else:
+                    mun_rows = []
+            else:
+                mun_rows = exact_mun_rows
 
             if not mun_rows and nombre and dept_norm:
                 mun_rows = [
@@ -419,6 +480,13 @@ def refresh_territorio_stats_cache(
                     for row in summaries_by_departamento_norm.get(dept_norm, [])
                     if _summary_matches(row)
                 ]
+
+            if not nombre and mun_rows:
+                fallback_nombre = next(
+                    (str(row.get("municipio") or "").strip() for row in mun_rows if str(row.get("municipio") or "").strip()),
+                    "",
+                )
+                nombre = fallback_nombre or None
 
             payload = {
                 "tipo": "municipio",

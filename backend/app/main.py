@@ -27,6 +27,7 @@ from app.data_loader import (
     build_departamentos_catalog,
     get_municipios_geojson_by_departamento,
     load_departamentos_geojson,
+    normalize_codigo_territorial,
     normalize_text,
 )
 from app.territorial_stats_cache import (
@@ -347,8 +348,19 @@ def _departamento_name_by_code() -> dict[str, str]:
     geojson = load_departamentos_geojson()
     for feature in geojson.get("features", []):
         props = feature.get("properties", {})
-        code = str(props.get("DPTO", "")).strip().zfill(2)
-        name = str(props.get("NOMBRE_DPT", "")).strip()
+        code = normalize_codigo_territorial(
+            props.get("departamento_codigo")
+            or props.get("canonical_id")
+            or props.get("DPTO")
+            or props.get("DPTO_CCDGO"),
+            2,
+        )
+        name = str(
+            props.get("departamento_nombre")
+            or props.get("NOMBRE_DPT")
+            or props.get("DPTO_CNMBR")
+            or ""
+        ).strip()
         if code and name:
             mapping[code] = name
     return mapping
@@ -359,11 +371,20 @@ def _municipio_name_by_code(municipio_code: str) -> str | None:
     geojson = get_municipios_geojson_by_departamento(dept_code)
     for feature in geojson.get("features", []):
         props = feature.get("properties", {})
-        feature_code = str(props.get("MPIO_CDPMP", "")).strip().zfill(5)
+        feature_code = normalize_codigo_territorial(
+            props.get("municipio_codigo")
+            or props.get("canonical_id")
+            or props.get("MPIO_CDPMP")
+            or props.get("CODIGO_DANE")
+            or props.get("COD_DANE")
+            or props.get("MPIO"),
+            5,
+        )
         if feature_code == municipio_code:
             name = (
-                props.get("MPIO_CNMBR")
+                props.get("municipio_nombre")
                 or props.get("NOMBRE_MPI")
+                or props.get("MPIO_CNMBR")
                 or props.get("nombre")
             )
             if name:
@@ -657,7 +678,8 @@ def search(
             dept_by_code = {dept.code: dept.name for dept in departamentos}
 
             for dept in departamentos:
-                if normalize_text(dept.name).startswith(q_norm) or dept.code.startswith(q_norm):
+                dept_name_norm = normalize_text(dept.name)
+                if q_norm in dept_name_norm or dept.code.startswith(q_norm):
                     results.append(
                         SearchItem(
                             id=dept.id,
@@ -672,7 +694,8 @@ def search(
                     total += 1
 
             for mun in build_municipios_catalog():
-                if normalize_text(mun.name).startswith(q_norm) or mun.code.startswith(q_norm):
+                mun_name_norm = normalize_text(mun.name)
+                if q_norm in mun_name_norm or mun.code.startswith(q_norm):
                     results.append(
                         SearchItem(
                             id=mun.id,
@@ -754,7 +777,7 @@ def analytics_territorio(
         cached = None
 
     if cached is not None:
-        if normalized_tipo in {"municipio", "departamento"} and cached.get("puestos_count", 0) == 0:
+        if normalized_tipo in {"municipio", "departamento"}:
             recomputed = compute_territorio_analytics(
                 tipo=normalized_tipo,
                 codigo=normalized_codigo,
@@ -762,7 +785,7 @@ def analytics_territorio(
                 departamento_name_by_code=_departamento_name_by_code,
                 municipio_name_by_code=_municipio_name_by_code,
             )
-            if recomputed.get("puestos_count", 0) > 0:
+            if recomputed != cached:
                 if cache_available:
                     try:
                         upsert_territorio_stats_cache(db, recomputed)

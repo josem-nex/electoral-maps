@@ -5,6 +5,9 @@ interface TeritorioStatsPanelProps {
   loading: boolean;
   error: boolean;
   tipo: "pais" | "zona" | "departamento" | "municipio" | null;
+  displayName?: string | null;
+  displayCode?: string | null;
+  integrityError?: boolean;
   onClose: () => void;
 }
 
@@ -22,6 +25,9 @@ export function TeritorioStatsPanel({
   loading,
   error,
   tipo,
+  displayName,
+  displayCode,
+  integrityError = false,
   onClose,
 }: TeritorioStatsPanelProps) {
   if (!loading && !error && !stats) return null;
@@ -75,16 +81,25 @@ export function TeritorioStatsPanel({
 
         {stats && !loading && (
           <>
+            {integrityError && (
+              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Se detectó una inconsistencia entre el ID territorial
+                seleccionado y sus metadatos. Se muestra la resolución canónica
+                disponible.
+              </div>
+            )}
             {/* Nombre del territorio */}
-            {stats.nombre && (
+            {(displayName || stats.nombre) && (
               <div className="mb-4">
                 <p className="text-xs uppercase tracking-wide text-gray-400 mb-0.5">
                   {tipoLabel}
                 </p>
                 <p className="text-base font-bold text-gray-800">
-                  {stats.nombre}
+                  {displayName || stats.nombre}
                 </p>
-                <p className="text-xs text-gray-400">Código: {stats.codigo}</p>
+                <p className="text-xs text-gray-400">
+                  Código: {displayCode || stats.codigo}
+                </p>
               </div>
             )}
 

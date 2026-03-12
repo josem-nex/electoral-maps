@@ -31,38 +31,40 @@ El sistema SHALL limitar la navegación del mapa al territorio de Colombia para 
 
 ### Requirement: Delimitación municipal por departamento seleccionado
 
-El sistema SHALL mostrar la geometría municipal del departamento seleccionado después del zoom de drill-down con ajuste automático de viewport.
+El sistema SHALL mostrar la geometría municipal del departamento seleccionado después del zoom de drill-down con ajuste automático de viewport, resolviendo la selección por identificador territorial canónico y no por posición en colección.
 
 #### Scenario: Carga de municipios al seleccionar departamento
 
 - **WHEN** el usuario selecciona un departamento en el mapa
-- **THEN** el frontend solicita al backend la geometría municipal filtrada por código de departamento
-- **AND** el mapa renderiza los municipios del departamento seleccionado con límites internos visibles
+- **THEN** el frontend MUST solicitar al backend la geometría municipal filtrada por código canónico del departamento seleccionado
+- **AND** el mapa MUST renderizar únicamente municipios cuyo código de departamento coincida con la selección canónica
 
 #### Scenario: Cambio de departamento seleccionado
 
 - **WHEN** el usuario selecciona un departamento diferente
-- **THEN** el sistema reemplaza la capa municipal anterior por la del nuevo departamento sin superponer geometrías antiguas
+- **THEN** el sistema MUST reemplazar la capa municipal anterior por la del nuevo departamento sin reutilizar índices previos de geometría
+- **AND** cada etiqueta municipal MUST corresponder al código canónico de su feature
 
 #### Scenario: Zoom automático al seleccionar departamento
 
 - **WHEN** el usuario selecciona un departamento en el mapa
-- **THEN** el mapa ejecuta zoom y centrado automático ajustando el viewport a los límites geográficos del departamento seleccionado
-- **AND** el nivel de zoom resultante permite visualizar claramente los límites municipales internos
+- **THEN** el mapa MUST ejecutar zoom y centrado automático ajustando el viewport a los límites geográficos del departamento seleccionado
+- **AND** el nivel de zoom resultante MUST permitir visualizar claramente los límites municipales internos
 
 ### Requirement: API de geometría municipal filtrada
 
-El backend SHALL exponer un endpoint de consulta de municipios por departamento en formato GeoJSON.
+El backend SHALL exponer un endpoint de consulta de municipios por departamento en formato GeoJSON con identificadores territoriales estables y consistentes para joins frontend.
 
 #### Scenario: Solicitud válida de municipios
 
 - **WHEN** el cliente invoca `GET /api/v1/geojson/municipios` con `departamento_codigo` válido
-- **THEN** el backend responde `200` con un `FeatureCollection` de municipios del departamento solicitado
+- **THEN** el backend MUST responder `200` con un `FeatureCollection` de municipios del departamento solicitado
+- **AND** cada feature MUST incluir código municipal canónico utilizable como llave de selección
 
 #### Scenario: Solicitud inválida sin código de departamento
 
 - **WHEN** el cliente invoca el endpoint sin `departamento_codigo`
-- **THEN** el backend responde con error de validación y no retorna geometría municipal
+- **THEN** el backend MUST responder con error de validación y no retornar geometría municipal
 
 ### Requirement: Centrado adaptativo para departamentos fronteras
 

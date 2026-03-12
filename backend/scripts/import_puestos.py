@@ -14,6 +14,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from app.database import SessionLocal
 from app.db_models import PuestoORM
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 # Mapeo de variantes de nombres de columnas a nombres estándar
 COLUMN_MAPPINGS = {
@@ -66,22 +67,18 @@ def validate_row(row_data: Dict, row_num: int) -> Tuple[bool, Optional[str]]:
         if not municipio_cod.isdigit() or len(municipio_cod) != 5:
             errors.append(f"Código municipio debe ser 5 dígitos numéricos: {municipio_cod}")
     
-    # Validar coordenadas si están presentes
+    # Validar coordenadas si están presentes (consulados pueden estar fuera de Colombia)
     lat = row_data.get('latitud')
     lon = row_data.get('longitud')
     if lat is not None and lat != '':
         try:
-            lat_float = float(lat)
-            if not (-5 <= lat_float <= 14):
-                errors.append(f"Latitud fuera de rango Colombia: {lat_float}")
+            float(lat)
         except (ValueError, TypeError):
             errors.append(f"Latitud inválida: {lat}")
             
     if lon is not None and lon != '':
         try:
-            lon_float = float(lon)
-            if not (-82 <= lon_float <= -66):
-                errors.append(f"Longitud fuera de rango Colombia: {lon_float}")
+            float(lon)
         except (ValueError, TypeError):
             errors.append(f"Longitud inválida: {lon}")
     
@@ -172,7 +169,10 @@ def import_puestos(
     
     puestos_to_insert = []
     
-    for row_idx, row in enumerate(ws.iter_rows(min_row=2), start=2):
+    for row_idx, row in enumerate(
+        ws.iter_rows(min_row=header_row_idx + 1),
+        start=header_row_idx + 1,
+    ):
         stats['total_rows'] += 1
         
         # Extraer datos
@@ -296,14 +296,22 @@ def import_puestos(
     if not dry_run and puestos_to_insert:
         db = SessionLocal()
         try:
-            # Usar ON CONFLICT para actualizar si ya existe
-            stmt = pg_insert(PuestoORM).values(puestos_to_insert)
+            # Usar ON CONFLICT para actualizar si ya existe (compatible con SQLite y PostgreSQL)
+            dialect_name = db.bind.dialect.name if db.bind is not None else ""
+            if dialect_name == "sqlite":
+                stmt = sqlite_insert(PuestoORM).values(puestos_to_insert)
+            else:
+                stmt = pg_insert(PuestoORM).values(puestos_to_insert)
+
             stmt = stmt.on_conflict_do_update(
                 index_elements=['codigo_puesto'],
                 set_={
+                    'departamento_codigo': stmt.excluded.departamento_codigo,
+                    'municipio_codigo': stmt.excluded.municipio_codigo,
                     'departamento': stmt.excluded.departamento,
                     'municipio': stmt.excluded.municipio,
                     'puesto': stmt.excluded.puesto,
+                    'comuna': stmt.excluded.comuna,
                     'direccion': stmt.excluded.direccion,
                     'mesas': stmt.excluded.mesas,
                     'mujeres': stmt.excluded.mujeres,

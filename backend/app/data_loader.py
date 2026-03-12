@@ -4,7 +4,7 @@ import re
 import unicodedata
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import Any, List, Optional, Tuple
 
 import pandas as pd
 
@@ -28,6 +28,63 @@ DEPARTMENT_ALIASES = {
     "VAUPES": "VAUPES",
     "NARINO": "NARINO",
 }
+
+DEPARTMENT_CANONICAL_CODE_OVERRIDES = {
+    "SAN ANDRES": "56",
+}
+
+DEPARTMENT_LEGACY_CODE_OVERRIDES = {
+    "88": "56",
+}
+
+
+def normalize_codigo_territorial(value: Any, length: int) -> str:
+    """Normalize a territorial code preserving left-zero padding."""
+    if value is None:
+        return ""
+    digits = re.sub(r"\D+", "", str(value))
+    if not digits:
+        return ""
+    return digits.zfill(length)[-length:]
+
+
+@lru_cache(maxsize=1)
+def canonical_department_code_by_norm_name() -> dict[str, str]:
+    """Build canonical department code lookup from DIVIPOLA by normalized name."""
+    municipios = load_municipios_divipola()
+    if municipios.empty:
+        return {}
+
+    unique_departments = (
+        municipios[["departamento_norm", "departamento_codigo"]]
+        .dropna(subset=["departamento_norm", "departamento_codigo"])
+        .drop_duplicates(subset=["departamento_norm"])
+    )
+
+    mapping: dict[str, str] = {}
+    for row in unique_departments.itertuples(index=False):
+        norm_name = str(row.departamento_norm).strip()
+        code = normalize_codigo_territorial(row.departamento_codigo, 2)
+        if norm_name and code:
+            mapping[norm_name] = code
+
+    return mapping
+
+
+def canonicalize_department_code(raw_code: Any, raw_name: Any) -> str:
+    """Resolve canonical department code preferring DIVIPOLA name-based mapping."""
+    normalized_code = normalize_codigo_territorial(raw_code, 2)
+    normalized_code = DEPARTMENT_LEGACY_CODE_OVERRIDES.get(normalized_code, normalized_code)
+    normalized_name = normalize_text(raw_name)
+    if not normalized_name:
+        return normalized_code
+
+    forced_code = DEPARTMENT_CANONICAL_CODE_OVERRIDES.get(normalized_name)
+    if forced_code:
+        return forced_code
+
+    canonical_by_name = canonical_department_code_by_norm_name().get(normalized_name)
+    return canonical_by_name or normalized_code
 
 
 def normalize_text(value) -> str:
@@ -88,11 +145,19 @@ def load_departamentos_geojson() -> dict:
     features = []
     for geometry in geometries:
         properties = dict(geometry.get("properties", {}))
-        dept_code = str(properties.get("DPTO_CCDGO", "")).strip().zfill(2)
+        raw_dept_code = normalize_codigo_territorial(
+            properties.get("DPTO_CCDGO") or properties.get("DPTO"),
+            2,
+        )
         dept_name = str(properties.get("DPTO_CNMBR", "")).strip()
+        dept_code = canonicalize_department_code(raw_dept_code, dept_name)
 
         properties["DPTO"] = dept_code
+        properties["DPTO_CCDGO"] = dept_code
         properties["NOMBRE_DPT"] = dept_name
+        properties["canonical_id"] = dept_code
+        properties["departamento_codigo"] = dept_code
+        properties["departamento_nombre"] = dept_name
 
         geojson_geometry = topo_geometry_to_geojson(geometry, arcs, scale, translate)
         if geojson_geometry.get("type") == "GeometryCollection":
@@ -199,10 +264,48 @@ def get_municipios_geojson_by_departamento(departamento_codigo: str) -> dict:
 
     features = []
     for geometry in geometries:
-        properties = geometry.get("properties", {})
-        dept_code = str(properties.get("DPTO_CCDGO", "")).strip().zfill(2)
+        properties = dict(geometry.get("properties", {}))
+        raw_dept_code = normalize_codigo_territorial(
+            properties.get("DPTO_CCDGO") or properties.get("DPTO"),
+            2,
+        )
+        dept_name = str(
+            properties.get("DPTO_CNMBR") or properties.get("NOMBRE_DPT") or ""
+        ).strip()
+        dept_code = canonicalize_department_code(raw_dept_code, dept_name)
         if dept_code != normalized_code:
             continue
+
+        municipio_code = normalize_codigo_territorial(
+            properties.get("MPIO_CDPMP")
+            or properties.get("CODIGO_DANE")
+            or properties.get("COD_DANE")
+            or properties.get("MPIO"),
+            5,
+        )
+        if municipio_code and not municipio_code.startswith(dept_code):
+            municipio_code = f"{dept_code}{municipio_code[-3:]}"
+        if not municipio_code:
+            municipio_rel_code = normalize_codigo_territorial(properties.get("MPIO_CCDGO"), 3)
+            if municipio_rel_code:
+                municipio_code = f"{dept_code}{municipio_rel_code}"
+
+        municipio_name = str(
+            properties.get("MPIO_CNMBR")
+            or properties.get("NOMBRE_MPI")
+            or properties.get("nombre")
+            or ""
+        ).strip()
+
+        properties["DPTO"] = dept_code
+        properties["DPTO_CCDGO"] = dept_code
+        properties["NOMBRE_DPT"] = dept_name
+        properties["MPIO_CDPMP"] = municipio_code
+        properties["canonical_id"] = municipio_code
+        properties["departamento_codigo"] = dept_code
+        properties["departamento_nombre"] = dept_name
+        properties["municipio_codigo"] = municipio_code
+        properties["municipio_nombre"] = municipio_name
 
         geojson_geometry = topo_geometry_to_geojson(geometry, arcs, scale, translate)
         if geojson_geometry.get("type") == "GeometryCollection":
@@ -228,7 +331,8 @@ def load_zonas_departamentos() -> pd.DataFrame:
     header_row = raw.iloc[2]
     records = []
     
-    for col_idx, zone_name in header_row.items():
+    for col_idx in range(raw.shape[1]):
+        zone_name = header_row.iloc[col_idx]
         if pd.isna(zone_name):
             continue
         zone_name = str(zone_name).strip()
@@ -405,9 +509,9 @@ def build_localidades_bogota() -> List[Jurisdiccion]:
 
 
 def get_puestos_by_filters(
-    departamento_codigo: str = None,
-    municipio_codigo: str = None,
-    localidad_codigo: str = None,
+    departamento_codigo: Optional[str] = None,
+    municipio_codigo: Optional[str] = None,
+    localidad_codigo: Optional[str] = None,
     limit: int = 2500,
 ) -> List[PuestoElectoral]:
     """Get puestos filtered by jurisdiction."""

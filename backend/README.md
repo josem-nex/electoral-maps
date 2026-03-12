@@ -97,6 +97,29 @@ El endpoint `GET /api/v1/analytics/territorio` ahora soporta `tipo=pais|zona|dep
 
 En caso de cache miss, el backend calcula el agregado, lo persiste (upsert) y devuelve la respuesta.
 
+## Limpieza de cache y entorno (si moviste el proyecto)
+
+Si cambiaste el directorio del repo, pueden quedar rutas viejas en variables de entorno o en el virtualenv.
+
+1. Verifica `DATA_DIR` en `backend/.env` (recomendado: `DATA_DIR=../data`).
+2. Reinicia el backend para limpiar caches en memoria (`lru_cache`).
+3. Si persisten rutas antiguas en `.venv`, recréalo:
+
+```bash
+cd backend
+rm -rf .venv
+python3.10 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+4. (Opcional) limpia bytecode/cache de Python:
+
+```bash
+find backend -type d -name "__pycache__" -prune -exec rm -rf {} +
+rm -rf backend/.pytest_cache
+```
+
 ### Refresco completo de cache
 
 Desde `backend/`:
