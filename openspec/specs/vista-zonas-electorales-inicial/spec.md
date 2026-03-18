@@ -26,3 +26,17 @@ El sistema SHALL construir la relación zona-departamento usando la información
 
 - **WHEN** el sistema inicializa la configuración de zonas
 - **THEN** el sistema MUST usar la asignación definida en `data/usar/ZONAS VS MUNICIPIOS.xls`
+
+### Requirement: Legibilidad reforzada de la vista inicial por zonas
+
+La vista inicial por zonas SHALL priorizar claridad visual mediante una paleta y estados interactivos que faciliten identificación rápida de cada zona electoral.
+
+#### Scenario: Diferenciación de zonas en vista inicial
+
+- **WHEN** el usuario abre la aplicación y se muestra el mapa en modo zonas
+- **THEN** cada zona MUST presentar suficiente diferenciación visual frente a zonas vecinas y el fondo
+
+#### Scenario: Estado hover y selección de zona
+
+- **WHEN** el usuario pasa el cursor o selecciona una zona
+- **THEN** el sistema MUST aplicar un estado visual más destacado que el estado base sin perder consistencia del mapa

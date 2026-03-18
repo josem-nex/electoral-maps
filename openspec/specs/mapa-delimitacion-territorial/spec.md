@@ -3,7 +3,9 @@
 ## Purpose
 
 TBD - created by archiving change mejorar-delimitacion-departamentos-municipios. Update Purpose after archive.
+
 ## Requirements
+
 ### Requirement: Límites departamentales con alto contraste
 
 El sistema SHALL renderizar los departamentos de Colombia con límites claramente distinguibles para facilitar lectura territorial en la vista nacional.
@@ -105,3 +107,16 @@ El sistema SHALL ofrecer una representación visual compacta del archipiélago d
 - **WHEN** la interfaz usa la vista compactada del archipiélago
 - **THEN** la interfaz MUST indicar que la ubicación es aproximada para fines de visualización
 
+### Requirement: Fondo cartográfico neutro para legibilidad territorial
+
+La interfaz del mapa SHALL usar un fondo visual neutro y claro en vistas nacionales para mejorar la lectura de límites y rellenos territoriales.
+
+#### Scenario: Fondo en vista país y zonas
+
+- **WHEN** el usuario visualiza la capa `pais` o `zonas`
+- **THEN** el mapa MUST renderizar un fondo claro y de bajo ruido visual que no compita con la información territorial
+
+#### Scenario: Contraste de límites sobre fondo
+
+- **WHEN** el mapa renderiza límites departamentales y de zonas sobre el fondo
+- **THEN** los bordes MUST conservar contraste suficiente para distinguir territorios adyacentes con claridad

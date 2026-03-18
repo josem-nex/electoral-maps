@@ -46,7 +46,7 @@ function App() {
       <Breadcrumbs />
 
       {/* Main Map */}
-      <main className="relative flex-1 min-h-0 bg-slate-100">
+      <main className="relative flex-1 min-h-0 bg-white">
         <ElectoralMap />
       </main>
 

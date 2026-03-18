@@ -3,6 +3,10 @@ import { api } from "../api/client";
 import type { SearchResult } from "../api/client";
 import { useNavigationStore } from "../stores/navigationStore";
 import type { Jurisdiccion } from "../stores/navigationStore";
+import {
+  normalizeDepartmentCode,
+  normalizeMunicipioCode,
+} from "../utils/territory";
 
 export function SearchBar() {
   const [query, setQuery] = useState("");
@@ -38,25 +42,35 @@ export function SearchBar() {
   const handleResultClick = async (result: SearchResult) => {
     try {
       if (result.type === "municipio" && result.parent_code) {
+        const municipioCode = normalizeMunicipioCode(result.code);
+        const parentDepartmentCode = normalizeDepartmentCode(
+          result.parent_code,
+        );
+        if (!municipioCode || !parentDepartmentCode) {
+          return;
+        }
+
         reset();
         const departamentos = await api.getJurisdicciones("departamentos");
-        const dept = departamentos.find((d) => d.code === result.parent_code);
+        const dept = departamentos.find(
+          (d) => normalizeDepartmentCode(d.code) === parentDepartmentCode,
+        );
 
         if (dept) {
           navigateTo(dept);
-          setSelectedMunicipioCode(result.code);
+          setSelectedMunicipioCode(municipioCode);
         } else {
           const fallbackDept: Jurisdiccion = {
-            id: `dept:${result.parent_code}`,
+            id: `dept:${parentDepartmentCode}`,
             layer: "departamentos",
-            name: result.parent_name || `Departamento ${result.parent_code}`,
-            code: result.parent_code,
+            name: result.parent_name || `Departamento ${parentDepartmentCode}`,
+            code: parentDepartmentCode,
             center_lat: result.center_lat,
             center_lon: result.center_lon,
             zoom: 8,
           };
           navigateTo(fallbackDept);
-          setSelectedMunicipioCode(result.code);
+          setSelectedMunicipioCode(municipioCode);
         }
       } else if (result.type === "departamento") {
         reset();

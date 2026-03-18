@@ -18,7 +18,6 @@ import {
 } from "../utils/territory";
 import {
   compactArchipelagoFeatureCollection,
-  COMPACT_ARCHIPELAGO_DEPARTMENT_CODE,
 } from "../utils/mapGeometry";
 
 // Fix for default marker icons in webpack
@@ -68,7 +67,7 @@ const COLOMBIA_BOUNDS: [[number, number], [number, number]] = [
   [13.6, -66.7],
 ];
 
-// Zoom levels: base view, then fit bounds maximums for each hierarchy level
+const NATIONAL_DEFAULT_ZOOM = 6.35;
 const ZONE_FIT_MAX_ZOOM = 8.7;
 const DEPARTMENT_FIT_MAX_ZOOM = 9.2;
 const MUNICIPALITY_FIT_MAX_ZOOM = 10.2;
@@ -299,7 +298,7 @@ export function ElectoralMap() {
   const center: [number, number] = currentJurisdiccion
     ? [currentJurisdiccion.center_lat, currentJurisdiccion.center_lon]
     : [4.5709, -74.2973];
-  const zoom = currentJurisdiccion?.zoom || 5.45;
+  const zoom = currentJurisdiccion?.zoom || NATIONAL_DEFAULT_ZOOM;
   const selectedDepartmentCode =
     currentJurisdiccion?.layer === "departamentos"
       ? normalizeDepartmentCode(currentJurisdiccion.code)
@@ -318,7 +317,7 @@ export function ElectoralMap() {
       code: CONSULADOS_DEPARTMENT_CODE,
       center_lat: COLOMBIA_CENTER[0],
       center_lon: COLOMBIA_CENTER[1],
-      zoom: 5.5,
+      zoom: NATIONAL_DEFAULT_ZOOM,
     });
   };
 
@@ -613,18 +612,6 @@ export function ElectoralMap() {
           currentJurisdiccion?.layer === "zonas",
       ),
     [filteredDepartamentosGeoJSON, currentJurisdiccion?.layer],
-  );
-
-  const showArchipelagoCompactionNotice = useMemo(
-    () =>
-      (currentJurisdiccion?.layer === "pais" ||
-        currentJurisdiccion?.layer === "zonas") &&
-      (displayDepartamentosGeoJSON?.features ?? []).some(
-        (feature: any) =>
-          departmentCodeFromFeature(feature) ===
-          COMPACT_ARCHIPELAGO_DEPARTMENT_CODE,
-      ),
-    [currentJurisdiccion?.layer, displayDepartamentosGeoJSON],
   );
 
   // Load GeoJSON for departments
@@ -1324,7 +1311,7 @@ export function ElectoralMap() {
     <div className="h-full w-full bg-white lg:p-4">
       <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-2 lg:gap-4">
         <section className="relative min-h-0 overflow-hidden bg-white lg:rounded-2xl lg:border lg:border-slate-200 lg:shadow-sm">
-          <div className="absolute top-4 right-4 z-[1000]">
+          <div className="absolute top-4 left-20 z-[1000]">
             {!isConsuladosDepartmentView ? (
               <button
                 onClick={openConsuladosView}
@@ -1401,21 +1388,13 @@ export function ElectoralMap() {
             </div>
           )}
 
-          {showArchipelagoCompactionNotice && (
-            <div className="pointer-events-none absolute bottom-4 left-4 z-[1000] max-w-xs rounded-2xl border border-blue-200 bg-white/95 px-4 py-3 text-xs text-slate-600 shadow-lg backdrop-blur-sm">
-              <span className="font-semibold text-slate-800">
-                Archipiélago reubicado
-              </span>{" "}
-              para visualización aproximada dentro del encuadre nacional.
-            </div>
-          )}
-
           <MapContainer
             center={center}
             zoom={zoom}
             className="h-full w-full"
             zoomControl={true}
-            zoomSnap={0.5}
+            zoomDelta={0.5}
+            zoomSnap={0.1}
             attributionControl={false}
             maxBounds={COLOMBIA_BOUNDS}
             maxBoundsViscosity={1.0}
