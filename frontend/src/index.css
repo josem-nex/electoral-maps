@@ -12,7 +12,7 @@ body {
 
 /* Leaflet overrides */
 .leaflet-container {
-  background: #f8f9fa;
+  background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%);
 }
 
 /* Municipality label styles */

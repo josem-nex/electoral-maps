@@ -9,6 +9,7 @@ interface TeritorioStatsPanelProps {
   displayCode?: string | null;
   integrityError?: boolean;
   onClose: () => void;
+  layout?: "floating" | "rail";
 }
 
 function StatRow({ label, value }: { label: string; value: string }) {
@@ -29,8 +30,11 @@ export function TeritorioStatsPanel({
   displayCode,
   integrityError = false,
   onClose,
+  layout = "floating",
 }: TeritorioStatsPanelProps) {
   if (!loading && !error && !stats) return null;
+
+  const isRailLayout = layout === "rail";
 
   const tipoLabel =
     tipo === "pais"
@@ -42,7 +46,13 @@ export function TeritorioStatsPanel({
           : "Municipio";
 
   return (
-    <div className="absolute top-4 right-4 z-[1000] bg-white rounded-xl shadow-xl w-72 max-h-[90vh] overflow-y-auto">
+    <div
+      className={
+        isRailLayout
+          ? "fixed inset-x-3 bottom-3 z-[1000] max-h-[calc(100vh-1.5rem)] overflow-y-auto rounded-2xl bg-white shadow-2xl lg:relative lg:inset-auto lg:flex lg:h-full lg:min-h-0 lg:w-full lg:flex-col lg:max-h-none lg:rounded-2xl lg:border lg:border-slate-200 lg:shadow-xl"
+          : "absolute top-4 right-4 z-[1000] max-h-[90vh] w-72 overflow-y-auto rounded-xl bg-white shadow-xl"
+      }
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gradient-to-r from-blue-700 to-blue-600 rounded-t-xl">
         <div className="flex items-center gap-2">

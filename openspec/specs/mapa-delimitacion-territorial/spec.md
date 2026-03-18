@@ -3,9 +3,7 @@
 ## Purpose
 
 TBD - created by archiving change mejorar-delimitacion-departamentos-municipios. Update Purpose after archive.
-
 ## Requirements
-
 ### Requirement: Límites departamentales con alto contraste
 
 El sistema SHALL renderizar los departamentos de Colombia con límites claramente distinguibles para facilitar lectura territorial en la vista nacional.
@@ -22,12 +20,17 @@ El sistema SHALL renderizar los departamentos de Colombia con límites clarament
 
 ### Requirement: Vista restringida al territorio colombiano
 
-El sistema SHALL limitar la navegación del mapa al territorio de Colombia para evitar mostrar países externos durante la operación.
+El sistema SHALL limitar la navegación y la representación visual del mapa al territorio de Colombia para evitar mostrar países externos durante la operación.
 
 #### Scenario: Desplazamiento fuera de Colombia
 
 - **WHEN** el usuario intenta arrastrar el mapa fuera del límite nacional
 - **THEN** el mapa mantiene la vista dentro de los límites configurados de Colombia
+
+#### Scenario: Render de contexto externo
+
+- **WHEN** el usuario visualiza la capa país o zonas en el mapa principal
+- **THEN** la interfaz MUST evitar mostrar geometría o etiquetas territoriales de otros países
 
 ### Requirement: Delimitación municipal por departamento seleccionado
 
@@ -80,3 +83,25 @@ El sistema SHALL ajustar el centrado de departamentos ubicados en fronteras naci
 
 - **WHEN** el usuario selecciona un departamento que no intersecta los límites de Colombia (ej. Cundinamarca, Antioquia)
 - **THEN** el mapa aplica zoom y centrado estándar sin ajustes temporales a maxBounds
+
+### Requirement: Representación compacta del archipiélago en vista nacional
+
+El sistema SHALL ofrecer una representación visual compacta del archipiélago de San Andrés, Providencia y Santa Catalina para optimizar el encuadre del mapa sin alterar identificadores territoriales canónicos.
+
+#### Scenario: Render de archipiélago en vista país o zonas
+
+- **WHEN** el usuario está en la vista `pais` o `zonas`
+- **THEN** el sistema MUST renderizar el archipiélago en posición visual compactada respecto al continente
+- **AND** el archipiélago MUST conservar su identidad territorial para selección, resaltado y agregados
+
+#### Scenario: Integridad de códigos territoriales
+
+- **WHEN** el usuario selecciona elementos del archipiélago en la vista compactada
+- **THEN** el sistema MUST resolver y emitir los códigos canónicos originales del departamento y municipios asociados
+- **AND** el sistema MUST NOT persistir coordenadas transformadas en APIs ni almacenamiento
+
+#### Scenario: Transparencia cartográfica de ubicación
+
+- **WHEN** la interfaz usa la vista compactada del archipiélago
+- **THEN** la interfaz MUST indicar que la ubicación es aproximada para fines de visualización
+

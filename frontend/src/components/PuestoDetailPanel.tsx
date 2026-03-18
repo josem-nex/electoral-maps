@@ -10,14 +10,18 @@ interface PuestoDetailPanelProps {
   puesto: PuestoElectoral | null;
   territoryContext?: PuestoTerritoryContext | null;
   onClose: () => void;
+  layout?: "floating" | "rail";
 }
 
 export function PuestoDetailPanel({
   puesto,
   territoryContext,
   onClose,
+  layout = "floating",
 }: PuestoDetailPanelProps) {
   if (!puesto) return null;
+
+  const isRailLayout = layout === "rail";
 
   const resolvedMunicipio = territoryContext?.municipio ?? puesto.municipio;
   const resolvedDepartamento =
@@ -28,12 +32,22 @@ export function PuestoDetailPanel({
     <>
       {/* Overlay oscuro para móvil */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-30 z-[999] md:hidden"
+        className={
+          isRailLayout
+            ? "fixed inset-0 z-[999] bg-black/30 lg:hidden"
+            : "fixed inset-0 bg-black bg-opacity-30 z-[999] md:hidden"
+        }
         onClick={onClose}
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 bottom-0 w-full md:w-96 md:right-4 md:top-4 md:bottom-4 md:rounded-lg bg-white shadow-2xl z-[1000] flex flex-col overflow-hidden">
+      <div
+        className={
+          isRailLayout
+            ? "fixed inset-0 z-[1000] flex flex-col overflow-hidden bg-white shadow-2xl lg:relative lg:inset-auto lg:h-full lg:min-h-0 lg:w-full lg:rounded-2xl lg:border lg:border-slate-200 lg:shadow-xl"
+            : "fixed right-0 top-0 bottom-0 z-[1000] flex w-full flex-col overflow-hidden bg-white shadow-2xl md:bottom-4 md:right-4 md:top-4 md:w-96 md:rounded-lg"
+        }
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0">
           <h3 className="font-bold text-lg text-gray-800">

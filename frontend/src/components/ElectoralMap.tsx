@@ -1,20 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  GeoJSON,
-  Marker,
-  Popup,
-  useMap,
-} from "react-leaflet";
+import { MapContainer, GeoJSON, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useNavigationStore } from "../stores/navigationStore";
 import { api } from "../api/client";
 import type { PuestoElectoral, TerritorioStats } from "../api/client";
 import type { Jurisdiccion } from "../stores/navigationStore";
-import { PuestoDetailPanel } from "./PuestoDetailPanel";
-import { TeritorioStatsPanel } from "./TeritorioStatsPanel";
+import { MapInfoRail } from "./MapInfoRail";
 import {
   departmentCodeFromFeature,
   departmentNameFromFeature,
@@ -24,6 +16,10 @@ import {
   normalizeMunicipioCode,
   type CanonicalTerritorySelection,
 } from "../utils/territory";
+import {
+  compactArchipelagoFeatureCollection,
+  COMPACT_ARCHIPELAGO_DEPARTMENT_CODE,
+} from "../utils/mapGeometry";
 
 // Fix for default marker icons in webpack
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -42,7 +38,8 @@ interface MapControllerProps {
   zoom: number;
   selectedDepartmentCode: string | null;
   selectedMunicipioCode: string | null;
-  departmentGeoJSON: any;
+  displayDepartmentGeoJSON: any;
+  rawDepartmentGeoJSON: any;
   municipiosGeoJSON: any;
   isInDepartmentView: boolean;
   isConsuladosDepartmentView: boolean;
@@ -80,7 +77,8 @@ function MapController({
   zoom,
   selectedDepartmentCode,
   selectedMunicipioCode,
-  departmentGeoJSON,
+  displayDepartmentGeoJSON,
+  rawDepartmentGeoJSON,
   municipiosGeoJSON,
   isInDepartmentView,
   isConsuladosDepartmentView,
@@ -125,15 +123,17 @@ function MapController({
 
   // Handle automatic zoom when a zone is selected
   useEffect(() => {
-    if (!selectedZoneId || !departmentGeoJSON) return;
+    if (!selectedZoneId || !displayDepartmentGeoJSON) return;
 
-    const zoneFeatures = (departmentGeoJSON.features ?? []).filter((f: any) => {
-      const code = departmentCodeFromFeature(f);
-      if (!code) {
-        return false;
-      }
-      return zoneByDepartmentCode.get(code)?.id === selectedZoneId;
-    });
+    const zoneFeatures = (displayDepartmentGeoJSON.features ?? []).filter(
+      (f: any) => {
+        const code = departmentCodeFromFeature(f);
+        if (!code) {
+          return false;
+        }
+        return zoneByDepartmentCode.get(code)?.id === selectedZoneId;
+      },
+    );
     if (zoneFeatures.length === 0) return;
 
     const geoJsonLayer = L.geoJSON({
@@ -152,14 +152,14 @@ function MapController({
         map.setMaxBounds(colombiaBounds.pad(1.5));
       }, 400);
     }
-  }, [selectedZoneId, departmentGeoJSON, zoneByDepartmentCode, map]);
+  }, [selectedZoneId, displayDepartmentGeoJSON, zoneByDepartmentCode, map]);
 
   // Handle automatic zoom when department is selected
   useEffect(() => {
     if (isConsuladosDepartmentView) return;
-    if (!selectedDepartmentCode || !departmentGeoJSON) return;
+    if (!selectedDepartmentCode || !rawDepartmentGeoJSON) return;
 
-    const departmentFeature = departmentGeoJSON.features?.find(
+    const departmentFeature = rawDepartmentGeoJSON.features?.find(
       (feature: any) =>
         departmentCodeFromFeature(feature) === selectedDepartmentCode,
     );
@@ -188,7 +188,7 @@ function MapController({
     }
   }, [
     selectedDepartmentCode,
-    departmentGeoJSON,
+    rawDepartmentGeoJSON,
     isConsuladosDepartmentView,
     map,
   ]);
@@ -567,6 +567,28 @@ export function ElectoralMap() {
     selectedZoneId,
     zoneByDepartmentCode,
   ]);
+
+  const displayDepartamentosGeoJSON = useMemo(
+    () =>
+      compactArchipelagoFeatureCollection(
+        filteredDepartamentosGeoJSON,
+        currentJurisdiccion?.layer === "pais" ||
+          currentJurisdiccion?.layer === "zonas",
+      ),
+    [filteredDepartamentosGeoJSON, currentJurisdiccion?.layer],
+  );
+
+  const showArchipelagoCompactionNotice = useMemo(
+    () =>
+      (currentJurisdiccion?.layer === "pais" ||
+        currentJurisdiccion?.layer === "zonas") &&
+      (displayDepartamentosGeoJSON?.features ?? []).some(
+        (feature: any) =>
+          departmentCodeFromFeature(feature) ===
+          COMPACT_ARCHIPELAGO_DEPARTMENT_CODE,
+      ),
+    [currentJurisdiccion?.layer, displayDepartamentosGeoJSON],
+  );
 
   // Load GeoJSON for departments
   useEffect(() => {
@@ -961,7 +983,8 @@ export function ElectoralMap() {
       navigateTo(dept);
     } else {
       // Create jurisdiction on the fly
-      const bounds = (L.geoJSON(feature) as any).getBounds();
+      const sourceFeature = departmentFeatureByCode.get(deptCode) ?? feature;
+      const bounds = (L.geoJSON(sourceFeature) as any).getBounds();
       const center = bounds.getCenter();
       setSelectedMunicipioCode(null);
       navigateTo({
@@ -990,7 +1013,7 @@ export function ElectoralMap() {
       return;
     }
 
-    const zoneFeatures = (departamentosGeoJSON?.features ?? []).filter(
+    const zoneFeatures = (displayDepartamentosGeoJSON?.features ?? []).filter(
       (f: any) =>
         zone.departmentCodes.includes(departmentCodeFromFeature(f) ?? ""),
     );
@@ -1208,200 +1231,202 @@ export function ElectoralMap() {
   };
 
   return (
-    <div className="relative w-full h-full">
-      <div className="absolute top-4 left-20 z-[1000]">
-        {!isConsuladosDepartmentView ? (
-          <button
-            onClick={openConsuladosView}
-            className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50"
-          >
-            Ver Consulados
-          </button>
-        ) : (
-          <div className="w-80 rounded-xl border border-blue-100 bg-white p-3 shadow-lg">
-            <div className="mb-2 flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-blue-600">
-                  Departamento especial
-                </p>
-                <p className="text-sm font-semibold text-slate-800">
-                  Consulados (88)
-                </p>
-              </div>
+    <div className="h-full w-full bg-slate-100 lg:p-4">
+      <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-2 lg:gap-4">
+        <section className="relative min-h-0 overflow-hidden bg-sky-100 lg:rounded-2xl lg:border lg:border-slate-200 lg:shadow-sm">
+          <div className="absolute top-4 left-20 z-[1000]">
+            {!isConsuladosDepartmentView ? (
               <button
-                onClick={closeConsuladosView}
-                className="text-xs font-medium text-blue-700 hover:text-blue-900"
+                onClick={openConsuladosView}
+                className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50"
               >
-                Cerrar
+                Ver Consulados
               </button>
-            </div>
-
-            <label className="mb-1 block text-xs font-medium text-slate-600">
-              País (municipio)
-            </label>
-            <select
-              value={selectedMunicipioCode ?? ""}
-              onChange={(event) => {
-                const value = event.target.value;
-                setSelectedMunicipioCode(value || null);
-              }}
-              className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-700"
-              disabled={consuladoMunicipiosLoading}
-            >
-              <option value="">Todos los consulados</option>
-              {consuladoMunicipios.map((option) => (
-                <option key={option.code} value={option.code}>
-                  {option.name} ({option.puestosCount} puestos)
-                </option>
-              ))}
-            </select>
-
-            {consuladoMunicipiosLoading && (
-              <p className="mt-2 text-xs text-slate-500">
-                Cargando países de consulados…
-              </p>
-            )}
-
-            {!consuladoMunicipiosLoading &&
-              consuladoMunicipios.length === 0 && (
-                <p className="mt-2 text-xs text-slate-500">
-                  No hay municipios de consulados disponibles.
-                </p>
-              )}
-          </div>
-        )}
-      </div>
-
-      {loading && (
-        <div className="absolute top-4 right-4 z-[1000] pointer-events-none">
-          <div className="flex items-center gap-3 rounded-full border border-blue-100 bg-white/95 px-4 py-2 shadow-lg backdrop-blur-sm">
-            <div className="h-5 w-5 rounded-full border-2 border-blue-600/30 border-t-blue-600 animate-spin" />
-            <div className="flex flex-col leading-tight">
-              <span className="text-sm font-semibold text-slate-800">
-                Cargando mapa
-              </span>
-              <span className="text-xs text-slate-500">{loadingLabel}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <MapContainer
-        center={center}
-        zoom={zoom}
-        className="w-full h-full"
-        zoomControl={true}
-        maxBounds={COLOMBIA_BOUNDS}
-        maxBoundsViscosity={1.0}
-        minZoom={5}
-      >
-        <MapController
-          center={center}
-          zoom={zoom}
-          selectedDepartmentCode={selectedDepartmentCode}
-          selectedMunicipioCode={selectedMunicipioCode}
-          departmentGeoJSON={departamentosGeoJSON}
-          municipiosGeoJSON={municipiosGeoJSON}
-          isInDepartmentView={currentJurisdiccion?.layer === "departamentos"}
-          isConsuladosDepartmentView={isConsuladosDepartmentView}
-          selectedZoneId={selectedZoneId}
-          zoneByDepartmentCode={zoneByDepartmentCode}
-        />
-
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-
-        {/* Show departments GeoJSON in general view */}
-        {currentJurisdiccion &&
-          ["pais", "zonas"].includes(currentJurisdiccion.layer) &&
-          filteredDepartamentosGeoJSON && (
-            <GeoJSON
-              key={`depts-${currentJurisdiccion.id}-${zoneByDepartmentCode.size}`}
-              data={filteredDepartamentosGeoJSON}
-              style={getDepartmentStyle}
-              onEachFeature={onEachFeature}
-            />
-          )}
-
-        {/* Show municipalities boundaries for selected department */}
-        {currentJurisdiccion?.layer === "departamentos" &&
-          municipiosGeoJSON && (
-            <GeoJSON
-              key={selectedDepartmentCode ?? "none"}
-              ref={(r: any) => {
-                municipiosLayerRef.current = r;
-              }}
-              data={municipiosGeoJSON}
-              style={municipioStyle}
-              interactive={true}
-              onEachFeature={onEachMunicipioFeature}
-            />
-          )}
-
-        {/* Removed municipality label markers - using GeoJSON tooltips instead */}
-
-        {/* Show puestos markers */}
-        {puestos.map((puesto) => (
-          <Marker
-            key={puesto.codigo_puesto}
-            position={[puesto.latitud, puesto.longitud]}
-            eventHandlers={{
-              click: () => setSelectedPuesto(puesto),
-            }}
-          >
-            <Popup>
-              <div className="text-sm">
-                <div className="font-bold">{puesto.puesto}</div>
-                <div className="text-xs text-gray-600">
-                  {puesto.codigo_puesto}
-                </div>
-                {puesto.direccion && (
-                  <div className="text-xs mt-1">{puesto.direccion}</div>
-                )}
-                {puesto.mesas && (
-                  <div className="text-xs mt-1">Mesas: {puesto.mesas}</div>
-                )}
-                {puesto.total && (
-                  <div className="text-xs">
-                    Potencial: {puesto.total.toLocaleString()}
+            ) : (
+              <div className="w-80 rounded-xl border border-blue-100 bg-white p-3 shadow-lg">
+                <div className="mb-2 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-blue-600">
+                      Departamento especial
+                    </p>
+                    <p className="text-sm font-semibold text-slate-800">
+                      Consulados (88)
+                    </p>
                   </div>
-                )}
-                <button
-                  className="mt-2 text-xs text-blue-600 underline"
-                  onClick={() => setSelectedPuesto(puesto)}
+                  <button
+                    onClick={closeConsuladosView}
+                    className="text-xs font-medium text-blue-700 hover:text-blue-900"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                  País (municipio)
+                </label>
+                <select
+                  value={selectedMunicipioCode ?? ""}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setSelectedMunicipioCode(value || null);
+                  }}
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-700"
+                  disabled={consuladoMunicipiosLoading}
                 >
-                  Ver detalles
-                </button>
+                  <option value="">Todos los consulados</option>
+                  {consuladoMunicipios.map((option) => (
+                    <option key={option.code} value={option.code}>
+                      {option.name} ({option.puestosCount} puestos)
+                    </option>
+                  ))}
+                </select>
+
+                {consuladoMunicipiosLoading && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Cargando países de consulados…
+                  </p>
+                )}
+
+                {!consuladoMunicipiosLoading &&
+                  consuladoMunicipios.length === 0 && (
+                    <p className="mt-2 text-xs text-slate-500">
+                      No hay municipios de consulados disponibles.
+                    </p>
+                  )}
               </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
+            )}
+          </div>
 
-      <PuestoDetailPanel
-        puesto={selectedPuesto}
-        territoryContext={selectedPuestoTerritory}
-        onClose={() => setSelectedPuesto(null)}
-      />
+          {loading && (
+            <div className="pointer-events-none absolute top-4 right-4 z-[1000]">
+              <div className="flex items-center gap-3 rounded-full border border-blue-100 bg-white/95 px-4 py-2 shadow-lg backdrop-blur-sm">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600/30 border-t-blue-600" />
+                <div className="flex flex-col leading-tight">
+                  <span className="text-sm font-semibold text-slate-800">
+                    Cargando mapa
+                  </span>
+                  <span className="text-xs text-slate-500">{loadingLabel}</span>
+                </div>
+              </div>
+            </div>
+          )}
 
-      {/* Territory stats panel — only shown when no individual puesto is selected */}
-      {!selectedPuesto && (
-        <TeritorioStatsPanel
-          stats={territorioStats}
-          loading={territorioStatsLoading}
-          error={territorioStatsError}
-          tipo={territorioTipo}
-          displayName={selectedTerritoryName}
-          displayCode={selectedTerritory?.canonicalId ?? null}
-          integrityError={selectedTerritoryIntegrityError}
-          onClose={() => {
+          {showArchipelagoCompactionNotice && (
+            <div className="pointer-events-none absolute bottom-4 left-4 z-[1000] max-w-xs rounded-2xl border border-blue-200 bg-white/95 px-4 py-3 text-xs text-slate-600 shadow-lg backdrop-blur-sm">
+              <span className="font-semibold text-slate-800">
+                Archipiélago reubicado
+              </span>{" "}
+              para visualización aproximada dentro del encuadre nacional.
+            </div>
+          )}
+
+          <MapContainer
+            center={center}
+            zoom={zoom}
+            className="h-full w-full"
+            zoomControl={true}
+            attributionControl={false}
+            maxBounds={COLOMBIA_BOUNDS}
+            maxBoundsViscosity={1.0}
+            minZoom={5}
+          >
+            <MapController
+              center={center}
+              zoom={zoom}
+              selectedDepartmentCode={selectedDepartmentCode}
+              selectedMunicipioCode={selectedMunicipioCode}
+              displayDepartmentGeoJSON={displayDepartamentosGeoJSON}
+              rawDepartmentGeoJSON={departamentosGeoJSON}
+              municipiosGeoJSON={municipiosGeoJSON}
+              isInDepartmentView={
+                currentJurisdiccion?.layer === "departamentos"
+              }
+              isConsuladosDepartmentView={isConsuladosDepartmentView}
+              selectedZoneId={selectedZoneId}
+              zoneByDepartmentCode={zoneByDepartmentCode}
+            />
+
+            {currentJurisdiccion &&
+              ["pais", "zonas"].includes(currentJurisdiccion.layer) &&
+              displayDepartamentosGeoJSON && (
+                <GeoJSON
+                  key={`depts-${currentJurisdiccion.id}-${zoneByDepartmentCode.size}`}
+                  data={displayDepartamentosGeoJSON}
+                  style={getDepartmentStyle}
+                  onEachFeature={onEachFeature}
+                />
+              )}
+
+            {currentJurisdiccion?.layer === "departamentos" &&
+              municipiosGeoJSON && (
+                <GeoJSON
+                  key={selectedDepartmentCode ?? "none"}
+                  ref={(r: any) => {
+                    municipiosLayerRef.current = r;
+                  }}
+                  data={municipiosGeoJSON}
+                  style={municipioStyle}
+                  interactive={true}
+                  onEachFeature={onEachMunicipioFeature}
+                />
+              )}
+
+            {puestos.map((puesto) => (
+              <Marker
+                key={puesto.codigo_puesto}
+                position={[puesto.latitud, puesto.longitud]}
+                eventHandlers={{
+                  click: () => setSelectedPuesto(puesto),
+                }}
+              >
+                <Popup>
+                  <div className="text-sm">
+                    <div className="font-bold">{puesto.puesto}</div>
+                    <div className="text-xs text-gray-600">
+                      {puesto.codigo_puesto}
+                    </div>
+                    {puesto.direccion && (
+                      <div className="text-xs mt-1">{puesto.direccion}</div>
+                    )}
+                    {puesto.mesas && (
+                      <div className="text-xs mt-1">Mesas: {puesto.mesas}</div>
+                    )}
+                    {puesto.total && (
+                      <div className="text-xs">
+                        Potencial: {puesto.total.toLocaleString()}
+                      </div>
+                    )}
+                    <button
+                      className="mt-2 text-xs text-blue-600 underline"
+                      onClick={() => setSelectedPuesto(puesto)}
+                    >
+                      Ver detalles
+                    </button>
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
+          </MapContainer>
+        </section>
+
+        <MapInfoRail
+          currentJurisdiccion={currentJurisdiccion}
+          selectedPuesto={selectedPuesto}
+          selectedPuestoTerritory={selectedPuestoTerritory}
+          territorioStats={territorioStats}
+          territorioStatsLoading={territorioStatsLoading}
+          territorioStatsError={territorioStatsError}
+          territorioTipo={territorioTipo}
+          selectedTerritoryName={selectedTerritoryName}
+          selectedTerritoryCode={selectedTerritory?.canonicalId ?? null}
+          selectedTerritoryIntegrityError={selectedTerritoryIntegrityError}
+          onClosePuesto={() => setSelectedPuesto(null)}
+          onCloseTerritorio={() => {
             setTerritorioStats(null);
             setTerritorioStatsError(false);
           }}
         />
-      )}
+      </div>
     </div>
   );
 }

@@ -461,11 +461,11 @@ def build_municipios_catalog() -> List[Jurisdiccion]:
         jurisdicciones.append(Jurisdiccion(
             id=f"mun:{row.municipio_codigo}",
             layer=ElectoralLayer.MUNICIPIO,
-            name=row.municipio_nombre,
-            code=row.municipio_codigo,
-            parent_code=row.departamento_codigo,
-            center_lat=float(row.latitud),
-            center_lon=float(row.longitud),
+            name=str(row.municipio_nombre),
+            code=str(row.municipio_codigo),
+            parent_code=str(row.departamento_codigo),
+            center_lat=float(row.latitud), # type: ignore
+            center_lon=float(row.longitud), # type: ignore
             zoom=9.0,
         ))
     
