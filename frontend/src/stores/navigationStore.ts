@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { normalizeMunicipioCode } from '../utils/territory';
 
 export type ElectoralLayer = 'pais' | 'zonas' | 'departamentos' | 'municipio' | 'localidad' | 'puesto';
 
@@ -35,7 +36,7 @@ const initialJurisdiccion: Jurisdiccion = {
   code: 'CO',
   center_lat: 4.5709,
   center_lon: -74.2973,
-  zoom: 5.2,
+  zoom: 5.5,
 };
 
 export const useNavigationStore = create<NavigationStore>((set) => ({
@@ -95,7 +96,11 @@ export const useNavigationStore = create<NavigationStore>((set) => ({
     };
   }),
 
-  setSelectedMunicipioCode: (code) => set({ selectedMunicipioCode: code }),
+  setSelectedMunicipioCode: (code) =>
+    set({
+      selectedMunicipioCode:
+        code === null ? null : normalizeMunicipioCode(code),
+    }),
 
   reset: () => set({
     currentLayer: 'pais',

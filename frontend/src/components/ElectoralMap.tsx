@@ -68,6 +68,11 @@ const COLOMBIA_BOUNDS: [[number, number], [number, number]] = [
   [13.6, -66.7],
 ];
 
+// Zoom levels: base view, then fit bounds maximums for each hierarchy level
+const ZONE_FIT_MAX_ZOOM = 8.7;
+const DEPARTMENT_FIT_MAX_ZOOM = 9.2;
+const MUNICIPALITY_FIT_MAX_ZOOM = 10.2;
+
 function isLikelyColombiaCenter(lat: number, lng: number): boolean {
   return lat >= -6 && lat <= 15 && lng >= -83 && lng <= -65;
 }
@@ -86,6 +91,9 @@ function MapController({
   zoneByDepartmentCode,
 }: MapControllerProps) {
   const map = useMap();
+  const normalizedSelectedMunicipioCode = normalizeMunicipioCode(
+    selectedMunicipioCode,
+  );
 
   useEffect(() => {
     if (isConsuladosDepartmentView) {
@@ -143,7 +151,7 @@ function MapController({
     const bounds = geoJsonLayer.getBounds();
     if (bounds.isValid()) {
       map.setMaxBounds(null as any);
-      map.fitBounds(bounds, { padding: [30, 30], maxZoom: 8 });
+      map.fitBounds(bounds, { padding: [26, 26], maxZoom: ZONE_FIT_MAX_ZOOM });
       const colombiaBounds = L.latLngBounds(
         COLOMBIA_BOUNDS[0] as [number, number],
         COLOMBIA_BOUNDS[1] as [number, number],
@@ -157,6 +165,7 @@ function MapController({
   // Handle automatic zoom when department is selected
   useEffect(() => {
     if (isConsuladosDepartmentView) return;
+    if (normalizedSelectedMunicipioCode) return;
     if (!selectedDepartmentCode || !rawDepartmentGeoJSON) return;
 
     const departmentFeature = rawDepartmentGeoJSON.features?.find(
@@ -175,7 +184,10 @@ function MapController({
         // Temporarily lift maxBounds so fitBounds is never clipped for
         // departments near Colombia's borders (e.g. Amazonas, Nariño, Guajira).
         map.setMaxBounds(null as any);
-        map.fitBounds(bounds, { padding: [20, 20], maxZoom: 9 });
+        map.fitBounds(bounds, {
+          padding: [20, 20],
+          maxZoom: DEPARTMENT_FIT_MAX_ZOOM,
+        });
         // Restore generous padding once the animation settles (~350 ms).
         const colombiaBounds = L.latLngBounds(
           COLOMBIA_BOUNDS[0] as [number, number],
@@ -187,6 +199,7 @@ function MapController({
       }
     }
   }, [
+    normalizedSelectedMunicipioCode,
     selectedDepartmentCode,
     rawDepartmentGeoJSON,
     isConsuladosDepartmentView,
@@ -195,11 +208,12 @@ function MapController({
 
   // Handle automatic zoom when municipality is selected from search
   useEffect(() => {
-    if (!selectedMunicipioCode || !municipiosGeoJSON) return;
+    if (!normalizedSelectedMunicipioCode || !municipiosGeoJSON) return;
 
     const municipioFeature = municipiosGeoJSON.features?.find(
       (feature: any) =>
-        municipalityCodeFromFeature(feature) === selectedMunicipioCode,
+        municipalityCodeFromFeature(feature) ===
+        normalizedSelectedMunicipioCode,
     );
 
     if (municipioFeature) {
@@ -212,7 +226,10 @@ function MapController({
         }
         // Same border-clipping fix as for departments.
         map.setMaxBounds(null as any);
-        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 10 });
+        map.fitBounds(bounds, {
+          padding: [60, 60],
+          maxZoom: MUNICIPALITY_FIT_MAX_ZOOM,
+        });
         const colombiaBounds = L.latLngBounds(
           COLOMBIA_BOUNDS[0] as [number, number],
           COLOMBIA_BOUNDS[1] as [number, number],
@@ -222,7 +239,7 @@ function MapController({
         }, 400);
       }
     }
-  }, [selectedMunicipioCode, municipiosGeoJSON, map]);
+  }, [normalizedSelectedMunicipioCode, municipiosGeoJSON, map]);
 
   return null;
 }
@@ -282,7 +299,7 @@ export function ElectoralMap() {
   const center: [number, number] = currentJurisdiccion
     ? [currentJurisdiccion.center_lat, currentJurisdiccion.center_lon]
     : [4.5709, -74.2973];
-  const zoom = currentJurisdiccion?.zoom || 5.2;
+  const zoom = currentJurisdiccion?.zoom || 5.5;
   const selectedDepartmentCode =
     currentJurisdiccion?.layer === "departamentos"
       ? normalizeDepartmentCode(currentJurisdiccion.code)
@@ -301,9 +318,26 @@ export function ElectoralMap() {
       code: CONSULADOS_DEPARTMENT_CODE,
       center_lat: COLOMBIA_CENTER[0],
       center_lon: COLOMBIA_CENTER[1],
-      zoom: 5.2,
+      zoom: 5.5,
     });
   };
+
+  useEffect(() => {
+    if (currentJurisdiccion?.layer === "departamentos") {
+      return;
+    }
+
+    if (selectedMunicipioCode !== null) {
+      setSelectedMunicipioCode(null);
+    }
+
+    setSelectedPuesto(null);
+    setPuestos([]);
+  }, [
+    currentJurisdiccion?.layer,
+    selectedMunicipioCode,
+    setSelectedMunicipioCode,
+  ]);
 
   const closeConsuladosView = () => {
     setSelectedMunicipioCode(null);
@@ -448,7 +482,10 @@ export function ElectoralMap() {
       const canonicalId = normalizeMunicipioCode(currentJurisdiccion.code);
       return canonicalId ? { level: "municipio", canonicalId } : null;
     }
-    if (selectedMunicipioCode) {
+    if (
+      currentJurisdiccion?.layer === "departamentos" &&
+      selectedMunicipioCode
+    ) {
       return { level: "municipio", canonicalId: selectedMunicipioCode };
     }
     if (selectedDepartmentCode) {
@@ -862,6 +899,8 @@ export function ElectoralMap() {
 
   // Load puestos when a municipio is selected from department view or search bar
   useEffect(() => {
+    let isActive = true;
+
     if (currentJurisdiccion?.layer !== "departamentos") return;
     if (isConsuladosDepartmentView) {
       setPuestos([]);
@@ -873,15 +912,43 @@ export function ElectoralMap() {
       setSelectedPuesto(null);
       return;
     }
+
+    const requestedMunicipioCode = selectedMunicipioCode;
+    const requestedDepartmentCode = selectedDepartmentCode;
+
     setSelectedPuesto(null);
     api
       .getPuestos({
-        departamento_codigo: selectedDepartmentCode ?? undefined,
-        municipio_codigo: selectedMunicipioCode,
+        departamento_codigo: requestedDepartmentCode ?? undefined,
+        municipio_codigo: requestedMunicipioCode,
         limit: 2500,
       })
-      .then(setPuestos)
-      .catch(console.error);
+      .then((puestosData) => {
+        if (!isActive) {
+          return;
+        }
+
+        const navigationState = useNavigationStore.getState();
+        const isStillInDepartmentLayer =
+          navigationState.currentJurisdiccion?.layer === "departamentos";
+        const isSameMunicipioSelection =
+          navigationState.selectedMunicipioCode === requestedMunicipioCode;
+
+        if (!isStillInDepartmentLayer || !isSameMunicipioSelection) {
+          return;
+        }
+
+        setPuestos(puestosData);
+      })
+      .catch((error) => {
+        if (isActive) {
+          console.error(error);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
   }, [
     selectedMunicipioCode,
     selectedDepartmentCode,
@@ -891,6 +958,8 @@ export function ElectoralMap() {
 
   // Load aggregated territory statistics for the active territorial layer
   useEffect(() => {
+    let isActive = true;
+
     const layer = currentJurisdiccion?.layer;
     if (
       !layer ||
@@ -898,7 +967,9 @@ export function ElectoralMap() {
     ) {
       setTerritorioStats(null);
       setTerritorioStatsError(false);
-      return;
+      return () => {
+        isActive = false;
+      };
     }
 
     let tipo: "pais" | "zona" | "departamento" | "municipio" | null = null;
@@ -933,7 +1004,9 @@ export function ElectoralMap() {
     if (!tipo || !codigo) {
       setTerritorioStats(null);
       setTerritorioStatsError(false);
-      return;
+      return () => {
+        isActive = false;
+      };
     }
 
     setTerritorioTipo(tipo);
@@ -943,9 +1016,26 @@ export function ElectoralMap() {
 
     api
       .getAnalyticsTerritorio(tipo, codigo)
-      .then((data) => setTerritorioStats(data))
-      .catch(() => setTerritorioStatsError(true))
-      .finally(() => setTerritorioStatsLoading(false));
+      .then((data) => {
+        if (!isActive) {
+          return;
+        }
+        setTerritorioStats(data);
+      })
+      .catch(() => {
+        if (isActive) {
+          setTerritorioStatsError(true);
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setTerritorioStatsLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
   }, [
     currentJurisdiccion?.layer,
     currentJurisdiccion?.id,
@@ -1040,14 +1130,14 @@ export function ElectoralMap() {
   };
 
   const zonePalette = [
-    ["#0369a1", "#bae6fd"],
-    ["#166534", "#bbf7d0"],
-    ["#7c2d12", "#fed7aa"],
-    ["#6b21a8", "#e9d5ff"],
-    ["#92400e", "#fef08a"],
-    ["#0f766e", "#99f6e4"],
-    ["#1d4ed8", "#bfdbfe"],
-    ["#be123c", "#fecdd3"],
+    ["#0c4a6e", "#e0f2fe"],
+    ["#14532d", "#dcfce7"],
+    ["#7c2d12", "#ffedd5"],
+    ["#581c87", "#f3e8ff"],
+    ["#7c3e0a", "#fef3c7"],
+    ["#134e4a", "#ccfbf1"],
+    ["#1e40af", "#dbeafe"],
+    ["#9f1239", "#ffe4e6"],
   ] as const;
 
   const zoneStyleForDepartment = (deptCode: string): L.PathOptions => {
@@ -1060,10 +1150,10 @@ export function ElectoralMap() {
 
     return {
       color: stroke,
-      weight: isInSelectedZone ? 3.4 : 2.2,
-      opacity: 0.95,
+      weight: isInSelectedZone ? 3.8 : 2.3,
+      opacity: isInSelectedZone ? 1 : 0.95,
       fillColor: fill,
-      fillOpacity: isInSelectedZone ? 0.35 : 0.22,
+      fillOpacity: isInSelectedZone ? 0.42 : 0.3,
     };
   };
 
@@ -1120,7 +1210,7 @@ export function ElectoralMap() {
       },
       mouseover: (e: any) => {
         if (currentLayer === "pais" || currentLayer === "zonas") {
-          e.target.setStyle({ fillOpacity: 0.3, weight: 3.4 });
+          e.target.setStyle({ fillOpacity: 0.38, weight: 3.9 });
         }
       },
       mouseout: (e: any) => {
@@ -1231,10 +1321,10 @@ export function ElectoralMap() {
   };
 
   return (
-    <div className="h-full w-full bg-slate-100 lg:p-4">
+    <div className="h-full w-full bg-white lg:p-4">
       <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-2 lg:gap-4">
-        <section className="relative min-h-0 overflow-hidden bg-sky-100 lg:rounded-2xl lg:border lg:border-slate-200 lg:shadow-sm">
-          <div className="absolute top-4 left-20 z-[1000]">
+        <section className="relative min-h-0 overflow-hidden bg-white lg:rounded-2xl lg:border lg:border-slate-200 lg:shadow-sm">
+          <div className="absolute top-4 right-4 z-[1000]">
             {!isConsuladosDepartmentView ? (
               <button
                 onClick={openConsuladosView}

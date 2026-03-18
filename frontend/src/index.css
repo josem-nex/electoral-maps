@@ -12,7 +12,13 @@ body {
 
 /* Leaflet overrides */
 .leaflet-container {
-  background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+}
+
+/* Move zoom controls to the right side */
+.leaflet-control-zoom {
+  left: auto !important;
+  right: 16px !important;
 }
 
 /* Municipality label styles */
