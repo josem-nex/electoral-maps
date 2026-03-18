@@ -19,6 +19,11 @@ body {
 .leaflet-control-zoom {
   left: auto !important;
   right: 16px !important;
+  top: 16px !important;
+}
+
+.leaflet-control-zoom.leaflet-bar {
+  border-radius: 4px;
 }
 
 /* Municipality label styles */

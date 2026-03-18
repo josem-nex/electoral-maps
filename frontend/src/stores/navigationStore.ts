@@ -36,7 +36,7 @@ const initialJurisdiccion: Jurisdiccion = {
   code: 'CO',
   center_lat: 4.5709,
   center_lon: -74.2973,
-  zoom: 5.5,
+  zoom: 5.0,
 };
 
 export const useNavigationStore = create<NavigationStore>((set) => ({

@@ -299,7 +299,7 @@ export function ElectoralMap() {
   const center: [number, number] = currentJurisdiccion
     ? [currentJurisdiccion.center_lat, currentJurisdiccion.center_lon]
     : [4.5709, -74.2973];
-  const zoom = currentJurisdiccion?.zoom || 5.5;
+  const zoom = currentJurisdiccion?.zoom || 5.45;
   const selectedDepartmentCode =
     currentJurisdiccion?.layer === "departamentos"
       ? normalizeDepartmentCode(currentJurisdiccion.code)
@@ -1415,6 +1415,7 @@ export function ElectoralMap() {
             zoom={zoom}
             className="h-full w-full"
             zoomControl={true}
+            zoomSnap={0.5}
             attributionControl={false}
             maxBounds={COLOMBIA_BOUNDS}
             maxBoundsViscosity={1.0}
