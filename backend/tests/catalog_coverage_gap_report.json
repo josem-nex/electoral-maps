@@ -1,11 +1,26 @@
 {
   "summary": {
     "catalog_total": 1122,
-    "with_data": 1122,
-    "without_data": 0,
-    "coverage_pct": 100.0
+    "with_data": 1120,
+    "without_data": 2,
+    "coverage_pct": 99.82
   },
-  "municipios_vacios": [],
+  "municipios_vacios": [
+    {
+      "codigo": "88001",
+      "nombre": "SAN ANDRÉS",
+      "departamento_codigo": "88",
+      "departamento": "",
+      "puestos_count": 0
+    },
+    {
+      "codigo": "88564",
+      "nombre": "PROVIDENCIA",
+      "departamento_codigo": "88",
+      "departamento": "",
+      "puestos_count": 0
+    }
+  ],
   "municipios_con_datos": [
     {
       "codigo": "11001",
@@ -456,6 +471,13 @@
       "puestos_count": 31
     },
     {
+      "codigo": "27250",
+      "nombre": "EL LITORAL DEL SAN JUAN",
+      "departamento_codigo": "27",
+      "departamento": "CHOCÓ",
+      "puestos_count": 31
+    },
+    {
       "codigo": "76622",
       "nombre": "ROLDANILLO",
       "departamento_codigo": "76",
@@ -474,13 +496,6 @@
       "nombre": "PÁEZ",
       "departamento_codigo": "19",
       "departamento": "CAUCA",
-      "puestos_count": 30
-    },
-    {
-      "codigo": "27250",
-      "nombre": "EL LITORAL DEL SAN JUAN",
-      "departamento_codigo": "27",
-      "departamento": "CHOCÓ",
       "puestos_count": 30
     },
     {
@@ -3946,13 +3961,6 @@
       "nombre": "VILLAGARZÓN",
       "departamento_codigo": "86",
       "departamento": "PUTUMAYO",
-      "puestos_count": 7
-    },
-    {
-      "codigo": "88001",
-      "nombre": "SAN ANDRÉS",
-      "departamento_codigo": "88",
-      "departamento": "ARCHIPIÉLAGO DE SAN ANDRÉS, PROVIDENCIA Y SANTA CATALINA",
       "puestos_count": 7
     },
     {
@@ -7775,13 +7783,6 @@
       "nombre": "SIBUNDOY",
       "departamento_codigo": "86",
       "departamento": "PUTUMAYO",
-      "puestos_count": 1
-    },
-    {
-      "codigo": "88564",
-      "nombre": "PROVIDENCIA",
-      "departamento_codigo": "88",
-      "departamento": "ARCHIPIÉLAGO DE SAN ANDRÉS, PROVIDENCIA Y SANTA CATALINA",
       "puestos_count": 1
     },
     {

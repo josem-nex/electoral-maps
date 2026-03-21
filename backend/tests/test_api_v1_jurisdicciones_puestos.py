@@ -768,6 +768,52 @@ def test_analytics_territorio_cache_viejo_consulados_se_autocorrige(
         assert cached.mesas_sum == 2
 
 
+def test_analytics_territorio_cache_viejo_pais_se_autocorrige_con_consulados(
+    client: TestClient,
+) -> None:
+    _create_hierarchy(client)
+    _create_puestos_for_territorio(client)
+    _create_puesto_consulado(client)
+
+    with app.state.testing_session_local() as db:
+        db.add(
+            TerritorioStatsCacheORM(
+                tipo="pais",
+                codigo="CO",
+                nombre="Colombia",
+                puestos_count=1,
+                mesas_sum=1,
+                total_sum=1,
+                mujeres_sum=1,
+                hombres_sum=1,
+            )
+        )
+        db.commit()
+
+    resp = client.get(
+        "/api/v1/analytics/territorio",
+        params={"tipo": "pais", "codigo": "CO"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+
+    assert payload["puestos_count"] == 3
+    assert payload["mesas_sum"] == 11
+    assert payload["total_sum"] == 490
+    assert payload["mujeres_sum"] == 220
+    assert payload["hombres_sum"] == 270
+
+    with app.state.testing_session_local() as db:
+        cached = db.query(TerritorioStatsCacheORM).filter_by(
+            tipo="pais",
+            codigo="CO",
+        ).first()
+        assert cached is not None
+        assert cached.puestos_count == 3
+        assert cached.mesas_sum == 11
+        assert cached.total_sum == 490
+
+
 def test_analytics_territorio_sin_puestos_devuelve_ceros(client: TestClient) -> None:
     resp = client.get(
         "/api/v1/analytics/territorio",

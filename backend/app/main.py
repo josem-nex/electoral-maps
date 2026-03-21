@@ -777,7 +777,7 @@ def analytics_territorio(
         cached = None
 
     if cached is not None:
-        if normalized_tipo in {"municipio", "departamento"}:
+        if normalized_tipo in {"pais", "municipio", "departamento"}:
             recomputed = compute_territorio_analytics(
                 tipo=normalized_tipo,
                 codigo=normalized_codigo,

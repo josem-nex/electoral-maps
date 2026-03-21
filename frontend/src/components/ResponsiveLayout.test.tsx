@@ -7,7 +7,9 @@ import { TeritorioStatsPanel } from "./TeritorioStatsPanel";
 describe("Responsive and touch-friendly layout", () => {
   it("mantiene SearchBar con altura táctil amplia", () => {
     render(<SearchBar />);
-    const input = screen.getByPlaceholderText("Buscar departamento o municipio...");
+    const input = screen.getByPlaceholderText(
+      "Buscar departamento o municipio...",
+    );
     expect(input.className).toContain("h-14");
     expect(input.className).toContain("text-lg");
   });
