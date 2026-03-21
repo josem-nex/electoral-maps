@@ -15,8 +15,8 @@ interface TeritorioStatsPanelProps {
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-      <span className="text-sm text-gray-500">{label}</span>
-      <span className="text-sm font-semibold text-gray-800">{value}</span>
+      <span className="text-base text-gray-500">{label}</span>
+      <span className="text-base font-semibold text-gray-800">{value}</span>
     </div>
   );
 }
@@ -54,16 +54,16 @@ export function TeritorioStatsPanel({
       }
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gradient-to-r from-blue-700 to-blue-600 rounded-t-xl">
+      <div className="flex items-center justify-between rounded-t-xl border-b border-gray-200 bg-gradient-to-r from-blue-700 to-blue-600 px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-blue-200" />
-          <h2 className="text-sm font-semibold text-white">
+          <h2 className="text-base font-semibold text-white">
             {tipoLabel} seleccionado
           </h2>
         </div>
         <button
           onClick={onClose}
-          className="text-blue-200 hover:text-white transition-colors text-lg leading-none"
+          className="text-xl leading-none text-blue-200 transition-colors hover:text-white"
           aria-label="Cerrar"
         >
           ×
@@ -74,7 +74,7 @@ export function TeritorioStatsPanel({
         {loading && (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
             <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            <span className="text-xs text-gray-400">
+            <span className="text-sm text-gray-400">
               Cargando estadísticas…
             </span>
           </div>
@@ -83,7 +83,7 @@ export function TeritorioStatsPanel({
         {error && !loading && (
           <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
             <span className="text-2xl">⚠️</span>
-            <span className="text-xs text-gray-500">
+            <span className="text-sm text-gray-500">
               No fue posible cargar las estadísticas del territorio.
             </span>
           </div>
@@ -92,7 +92,7 @@ export function TeritorioStatsPanel({
         {stats && !loading && (
           <>
             {integrityError && (
-              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                 Se detectó una inconsistencia entre el ID territorial
                 seleccionado y sus metadatos. Se muestra la resolución canónica
                 disponible.
@@ -101,13 +101,10 @@ export function TeritorioStatsPanel({
             {/* Nombre del territorio */}
             {(displayName || stats.nombre) && (
               <div className="mb-4">
-                <p className="text-xs uppercase tracking-wide text-gray-400 mb-0.5">
-                  {tipoLabel}
-                </p>
-                <p className="text-base font-bold text-gray-800">
+                <p className="text-xl font-bold text-gray-800">
                   {displayName || stats.nombre}
                 </p>
-                <p className="text-xs text-gray-400">
+                <p className="text-sm text-gray-400">
                   Código: {displayCode || stats.codigo}
                 </p>
               </div>
@@ -115,13 +112,13 @@ export function TeritorioStatsPanel({
 
             {/* Estadísticas principales */}
             <div className="bg-blue-50 rounded-lg p-3 mb-3">
-              <p className="text-xs uppercase tracking-wide text-blue-600 mb-1 font-semibold">
+              <p className="mb-1 text-sm font-semibold uppercase tracking-wide text-blue-600">
                 Cobertura electoral
               </p>
-              <div className="text-2xl font-bold text-blue-700">
+              <div className="text-3xl font-bold text-blue-700">
                 {stats.puestos_count.toLocaleString()}
               </div>
-              <p className="text-xs text-blue-500">
+              <p className="text-sm text-blue-500">
                 {stats.puestos_count === 1
                   ? "puesto electoral"
                   : "puestos electorales"}
@@ -161,7 +158,7 @@ export function TeritorioStatsPanel({
             </div>
 
             {stats.puestos_count === 0 && (
-              <p className="text-xs text-center text-gray-400 mt-4">
+              <p className="mt-4 text-center text-sm text-gray-400">
                 Sin datos de puestos registrados para este territorio.
               </p>
             )}

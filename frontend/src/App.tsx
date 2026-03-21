@@ -10,14 +10,14 @@ function App() {
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="bg-blue-600 text-white shadow-md z-10">
-        <div className="px-4 py-4">
+      <header className="z-10 bg-blue-600 text-white">
+        <div className="px-4 py-5">
           <div className="flex items-center justify-between mb-3">
-            <h1 className="text-2xl font-bold">Mapas Electorales Colombia</h1>
+            <h1 className="text-3xl font-bold">Mapas Electorales Colombia</h1>
             {navigationStack.length > 1 && (
               <button
                 onClick={navigateBack}
-                className="px-4 py-2 bg-blue-700 hover:bg-blue-800 rounded-lg transition-colors flex items-center gap-2"
+                className="flex items-center gap-2 rounded-lg bg-blue-700 px-5 py-2.5 text-base transition-colors hover:bg-blue-800"
               >
                 <svg
                   className="w-4 h-4"
@@ -36,7 +36,7 @@ function App() {
               </button>
             )}
           </div>
-          <div className="max-w-2xl">
+          <div className="max-w-3xl">
             <SearchBar />
           </div>
         </div>

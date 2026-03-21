@@ -101,37 +101,41 @@ export function SearchBar() {
         onChange={(e) => handleSearch(e.target.value)}
         onFocus={() => setShowResults(query.trim().length > 0)}
         placeholder="Buscar departamento o municipio..."
-        className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="h-14 w-full rounded-lg border border-blue-200 bg-white px-5 pr-12 text-lg text-slate-900 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
       />
-      <svg
-        className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-        />
-      </svg>
+      {!isSearching && (
+        <svg
+          className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          />
+        </svg>
+      )}
       {isSearching && (
-        <div className="absolute right-3 top-2.5">
+        <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2">
           <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
         </div>
       )}
 
       {showResults && results.length > 0 && (
-        <div className="absolute z-10 w-full mt-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+        <div className="absolute z-20 mt-2 max-h-96 w-full overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-xl">
           {results.map((result) => (
             <button
               key={result.id}
               onClick={() => handleResultClick(result)}
-              className="w-full px-4 py-3 text-left hover:bg-gray-100 border-b border-gray-100 last:border-b-0 transition-colors"
+              className="w-full border-b border-gray-100 px-5 py-4 text-left transition-colors last:border-b-0 hover:bg-gray-100"
             >
-              <div className="font-medium text-gray-900">{result.name}</div>
-              <div className="text-sm text-gray-500">
+              <div className="text-lg font-semibold text-gray-900">
+                {result.name}
+              </div>
+              <div className="mt-1 text-base text-gray-600">
                 {result.type === "departamento" && "Departamento"}
                 {result.type === "municipio" &&
                   `Municipio${result.parent_name ? ` • ${result.parent_name}` : ""}`}
@@ -146,7 +150,7 @@ export function SearchBar() {
         results.length === 0 &&
         query.trim().length >= 1 &&
         !isSearching && (
-          <div className="absolute z-10 w-full mt-2 bg-white border border-gray-300 rounded-lg shadow-lg p-4 text-center text-gray-500">
+          <div className="absolute z-20 mt-2 w-full rounded-lg border border-gray-300 bg-white p-5 text-center text-lg text-gray-500 shadow-xl">
             No se encontraron resultados
           </div>
         )}

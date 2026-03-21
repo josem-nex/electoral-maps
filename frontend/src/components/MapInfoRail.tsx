@@ -88,13 +88,13 @@ export function MapInfoRail({
           data-testid="desktop-info-placeholder"
         >
           <div className="border-b border-slate-200 px-6 py-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">
               Panel lateral disponible
             </p>
-            <h2 className="mt-2 text-xl font-semibold text-slate-900">
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900">
               Información territorial
             </h2>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-base text-slate-600">
               {currentContextLabel}
               {currentJurisdiccion?.name
                 ? ` · ${currentJurisdiccion.name}`
@@ -102,9 +102,11 @@ export function MapInfoRail({
             </p>
           </div>
 
-          <div className="flex-1 space-y-5 overflow-y-auto px-6 py-6 text-sm text-slate-600">
+          <div className="flex-1 space-y-5 overflow-y-auto px-6 py-6 text-base text-slate-600">
             <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="font-medium text-slate-900">Qué aparecerá aquí</p>
+              <p className="text-lg font-medium text-slate-900">
+                Qué aparecerá aquí
+              </p>
               <ul className="mt-3 space-y-2 list-disc pl-5">
                 <li>Estadísticas del territorio seleccionado.</li>
                 <li>Detalle del puesto cuando selecciones un marcador.</li>
@@ -113,7 +115,7 @@ export function MapInfoRail({
             </div>
 
             <div>
-              <p className="font-medium text-slate-900">Sugerencia</p>
+              <p className="text-lg font-medium text-slate-900">Sugerencia</p>
               <p className="mt-2 leading-6">
                 Navega por zonas, departamentos o municipios para poblar este
                 rail. El mapa queda libre en la mitad izquierda para priorizar
@@ -122,7 +124,7 @@ export function MapInfoRail({
             </div>
 
             {selectedTerritoryCode && (
-              <div className="rounded-2xl border border-slate-200 px-4 py-3 text-xs text-slate-500">
+              <div className="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-500">
                 Último código territorial resuelto: {selectedTerritoryCode}
               </div>
             )}

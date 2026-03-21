@@ -1,20 +1,20 @@
-import { useNavigationStore } from '../stores/navigationStore';
+import { useNavigationStore } from "../stores/navigationStore";
 
 export function Breadcrumbs() {
   const { navigationStack, navigateToIndex } = useNavigationStore();
-  
+
   return (
-    <div className="bg-white shadow-sm border-b px-4 py-2">
-      <div className="flex items-center space-x-2 text-sm">
+    <div className="mx-2 rounded-b-md border-x border-b bg-white px-5 py-3.5">
+      <div className="flex items-center space-x-2 text-lg">
         {navigationStack.map((jurisdiccion, index) => (
           <div key={jurisdiccion.id} className="flex items-center">
-            {index > 0 && <span className="text-gray-400 mx-2">/</span>}
+            {index > 0 && <span className="mx-2 text-xl text-gray-400">/</span>}
             <button
               onClick={() => navigateToIndex(index)}
-              className={`hover:text-blue-600 transition-colors ${
+              className={`text-lg hover:text-blue-600 transition-colors ${
                 index === navigationStack.length - 1
-                  ? 'font-semibold text-blue-600'
-                  : 'text-gray-600 hover:underline'
+                  ? "font-semibold text-blue-600"
+                  : "text-gray-600 hover:underline"
               }`}
             >
               {jurisdiccion.name}

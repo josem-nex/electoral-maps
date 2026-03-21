@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, GeoJSON, Marker, Popup, useMap } from "react-leaflet";
+import {
+  MapContainer,
+  GeoJSON,
+  Marker,
+  Popup,
+  ZoomControl,
+  useMap,
+} from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useNavigationStore } from "../stores/navigationStore";
@@ -16,9 +23,7 @@ import {
   normalizeMunicipioCode,
   type CanonicalTerritorySelection,
 } from "../utils/territory";
-import {
-  compactArchipelagoFeatureCollection,
-} from "../utils/mapGeometry";
+import { compactArchipelagoFeatureCollection } from "../utils/mapGeometry";
 
 // Fix for default marker icons in webpack
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -1117,14 +1122,14 @@ export function ElectoralMap() {
   };
 
   const zonePalette = [
-    ["#0c4a6e", "#e0f2fe"],
-    ["#14532d", "#dcfce7"],
-    ["#7c2d12", "#ffedd5"],
-    ["#581c87", "#f3e8ff"],
-    ["#7c3e0a", "#fef3c7"],
-    ["#134e4a", "#ccfbf1"],
-    ["#1e40af", "#dbeafe"],
-    ["#9f1239", "#ffe4e6"],
+    ["#075985", "#bae6fd"],
+    ["#166534", "#bbf7d0"],
+    ["#9a3412", "#fdba74"],
+    ["#6b21a8", "#d8b4fe"],
+    ["#92400e", "#fcd34d"],
+    ["#0f766e", "#99f6e4"],
+    ["#4338ca", "#c7d2fe"],
+    ["#9d174d", "#fbcfe8"],
   ] as const;
 
   const zoneStyleForDepartment = (deptCode: string): L.PathOptions => {
@@ -1311,16 +1316,16 @@ export function ElectoralMap() {
     <div className="h-full w-full bg-white lg:p-4">
       <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-2 lg:gap-4">
         <section className="relative min-h-0 overflow-hidden bg-white lg:rounded-2xl lg:border lg:border-slate-200 lg:shadow-sm">
-          <div className="absolute top-4 left-20 z-[1000]">
+          <div className="absolute right-20 top-2.5 z-[1000]">
             {!isConsuladosDepartmentView ? (
               <button
                 onClick={openConsuladosView}
-                className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50"
+                className="rounded-lg border border-blue-200 bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50"
               >
                 Ver Consulados
               </button>
             ) : (
-              <div className="w-80 rounded-xl border border-blue-100 bg-white p-3 shadow-lg">
+              <div className="w-80 rounded-xl border border-blue-100 bg-white p-4 shadow-lg">
                 <div className="mb-2 flex items-center justify-between">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-blue-600">
@@ -1375,7 +1380,7 @@ export function ElectoralMap() {
           </div>
 
           {loading && (
-            <div className="pointer-events-none absolute top-4 right-4 z-[1000]">
+            <div className="pointer-events-none absolute left-4 top-4 z-[1000]">
               <div className="flex items-center gap-3 rounded-full border border-blue-100 bg-white/95 px-4 py-2 shadow-lg backdrop-blur-sm">
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600/30 border-t-blue-600" />
                 <div className="flex flex-col leading-tight">
@@ -1392,7 +1397,7 @@ export function ElectoralMap() {
             center={center}
             zoom={zoom}
             className="h-full w-full"
-            zoomControl={true}
+            zoomControl={false}
             zoomDelta={0.5}
             zoomSnap={0.1}
             attributionControl={false}
@@ -1400,6 +1405,7 @@ export function ElectoralMap() {
             maxBoundsViscosity={1.0}
             minZoom={5}
           >
+            <ZoomControl position="topright" />
             <MapController
               center={center}
               zoom={zoom}
@@ -1479,23 +1485,25 @@ export function ElectoralMap() {
           </MapContainer>
         </section>
 
-        <MapInfoRail
-          currentJurisdiccion={currentJurisdiccion}
-          selectedPuesto={selectedPuesto}
-          selectedPuestoTerritory={selectedPuestoTerritory}
-          territorioStats={territorioStats}
-          territorioStatsLoading={territorioStatsLoading}
-          territorioStatsError={territorioStatsError}
-          territorioTipo={territorioTipo}
-          selectedTerritoryName={selectedTerritoryName}
-          selectedTerritoryCode={selectedTerritory?.canonicalId ?? null}
-          selectedTerritoryIntegrityError={selectedTerritoryIntegrityError}
-          onClosePuesto={() => setSelectedPuesto(null)}
-          onCloseTerritorio={() => {
-            setTerritorioStats(null);
-            setTerritorioStatsError(false);
-          }}
-        />
+        <div className="min-h-0 lg:pr-4 xl:pr-6">
+          <MapInfoRail
+            currentJurisdiccion={currentJurisdiccion}
+            selectedPuesto={selectedPuesto}
+            selectedPuestoTerritory={selectedPuestoTerritory}
+            territorioStats={territorioStats}
+            territorioStatsLoading={territorioStatsLoading}
+            territorioStatsError={territorioStatsError}
+            territorioTipo={territorioTipo}
+            selectedTerritoryName={selectedTerritoryName}
+            selectedTerritoryCode={selectedTerritory?.canonicalId ?? null}
+            selectedTerritoryIntegrityError={selectedTerritoryIntegrityError}
+            onClosePuesto={() => setSelectedPuesto(null)}
+            onCloseTerritorio={() => {
+              setTerritorioStats(null);
+              setTerritorioStatsError(false);
+            }}
+          />
+        </div>
       </div>
     </div>
   );
