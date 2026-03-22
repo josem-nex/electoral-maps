@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import re
 from difflib import SequenceMatcher
-from functools import lru_cache
 from typing import Any, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -22,6 +21,9 @@ from app.db_models import (
     JurisdiccionORM,
     PersonaORM,
     PuestoORM,
+    TerritorioDepartamentoORM,
+    TerritorioMunicipioORM,
+    TerritorioZonaORM,
 )
 from app.data_loader import (
     build_departamentos_catalog,
@@ -126,6 +128,8 @@ class PuestoCreate(BaseModel):
     municipio: str
     puesto: str
     comuna: Optional[str] = None
+    zona_codigo: Optional[str] = None
+    puesto_codigo: Optional[str] = None
     direccion: Optional[str] = None
     mujeres: Optional[int] = None
     hombres: Optional[int] = None
@@ -342,8 +346,23 @@ def _municipio_names_match(expected_name: str | None, candidate_name: str | None
     return False
 
 
-@lru_cache(maxsize=1)
-def _departamento_name_by_code() -> dict[str, str]:
+def _departamento_name_by_code_from_db(db: Session) -> dict[str, str]:
+    return {
+        str(row.codigo).zfill(2): str(row.nombre).strip()
+        for row in db.query(TerritorioDepartamentoORM).all()
+        if row.codigo
+    }
+
+
+def _municipio_name_by_code_from_db(db: Session) -> dict[str, str]:
+    return {
+        str(row.codigo).zfill(5): str(row.nombre).strip()
+        for row in db.query(TerritorioMunicipioORM).all()
+        if row.codigo
+    }
+
+
+def _departamento_code_by_norm_name_from_geojson() -> dict[str, str]:
     mapping: dict[str, str] = {}
     geojson = load_departamentos_geojson()
     for feature in geojson.get("features", []):
@@ -362,34 +381,8 @@ def _departamento_name_by_code() -> dict[str, str]:
             or ""
         ).strip()
         if code and name:
-            mapping[code] = name
+            mapping[_normalize_text(name)] = code
     return mapping
-
-
-def _municipio_name_by_code(municipio_code: str) -> str | None:
-    dept_code = municipio_code[:2]
-    geojson = get_municipios_geojson_by_departamento(dept_code)
-    for feature in geojson.get("features", []):
-        props = feature.get("properties", {})
-        feature_code = normalize_codigo_territorial(
-            props.get("municipio_codigo")
-            or props.get("canonical_id")
-            or props.get("MPIO_CDPMP")
-            or props.get("CODIGO_DANE")
-            or props.get("COD_DANE")
-            or props.get("MPIO"),
-            5,
-        )
-        if feature_code == municipio_code:
-            name = (
-                props.get("municipio_nombre")
-                or props.get("NOMBRE_MPI")
-                or props.get("MPIO_CNMBR")
-                or props.get("nombre")
-            )
-            if name:
-                return str(name).strip()
-    return None
 
 
 # ---------------------------------------------------------------------------
@@ -426,10 +419,49 @@ def list_jurisdicciones(
 
 
 @app.get("/api/v1/catalog/departamentos")
-def get_departamentos_catalog():
-    """Return departamentos catalog enriched with zone mapping."""
-    _, departamentos = build_departamentos_catalog()
-    return [item.model_dump() for item in departamentos]
+def get_departamentos_catalog(db: Session = Depends(get_db)):
+    """Return departamentos catalog using Excel IDs persisted in DB."""
+    catalog_rows = db.query(TerritorioDepartamentoORM).all()
+    if not catalog_rows:
+        _, departamentos = build_departamentos_catalog()
+        return [item.model_dump() for item in departamentos]
+
+    _, geo_departamentos = build_departamentos_catalog()
+    geo_by_norm_name = {
+        _normalize_text(dept.name): dept
+        for dept in geo_departamentos
+    }
+    zonas_by_code = {
+        str(zone.codigo).zfill(2): zone
+        for zone in db.query(TerritorioZonaORM).all()
+    }
+
+    payload: list[dict[str, Any]] = []
+    for row in sorted(catalog_rows, key=lambda item: str(item.codigo)):
+        code = str(row.codigo).zfill(2)
+        name = str(row.nombre or "").strip() or code
+        geo_item = geo_by_norm_name.get(_normalize_text(name))
+        zone_code = str(row.zona_codigo).zfill(2) if row.zona_codigo else None
+        zone_item = zonas_by_code.get(zone_code or "")
+        zone_name = str(zone_item.nombre).strip() if zone_item else (
+            f"Zona {int(zone_code)}" if zone_code else "Sin zona"
+        )
+
+        payload.append(
+            {
+                "id": f"dept:{code}",
+                "layer": "departamentos",
+                "name": name,
+                "code": code,
+                "zone_id": int(zone_code) if zone_code else 0,
+                "zone_name": zone_name,
+                "center_lat": geo_item.center_lat if geo_item else 4.5709,
+                "center_lon": geo_item.center_lon if geo_item else -74.2973,
+                "zoom": geo_item.zoom if geo_item else 8.2,
+            }
+        )
+
+    return payload
 
 
 @app.post("/api/v1/jurisdicciones", response_model=JurisdiccionRead, status_code=201)
@@ -526,57 +558,18 @@ def list_puestos(
         ):
             effective_limit = min(limit, LIMIT_CAP)
             return PuestosPage(total=0, limit=effective_limit, items=[])
-
-        municipio_name = _municipio_name_by_code(normalized_municipio_code)
-        departamento_name = _departamento_name_by_code().get(normalized_municipio_code[:2])
-        municipio_norm = _normalize_text(municipio_name)
-        departamento_norm = _normalize_text(departamento_name)
-
-        q_municipio = q.filter(PuestoORM.municipio_codigo == normalized_municipio_code)
-
-        exact_rows = q_municipio.all()
-        if exact_rows:
-            if municipio_norm:
-                exact_matching_rows = []
-                for row in exact_rows:
-                    if not _municipio_names_match(municipio_name, row.municipio):
-                        continue
-                    if departamento_norm and _normalize_text(row.departamento) != departamento_norm:
-                        continue
-                    exact_matching_rows.append(row)
-
-                if exact_matching_rows:
-                    effective_limit = min(limit, LIMIT_CAP)
-                    return PuestosPage(
-                        total=len(exact_matching_rows),
-                        limit=effective_limit,
-                        items=exact_matching_rows[:effective_limit],
-                    )
-            else:
-                q = q_municipio
-                effective_limit = min(limit, LIMIT_CAP)
-                total = q.count()
-                items = q.limit(effective_limit).all()
-                return PuestosPage(total=total, limit=effective_limit, items=[PuestoRead.model_validate(item) for item in items])
-
-        if municipio_name:
-            fallback_rows = []
-            for row in q.all():
-                if not _municipio_names_match(municipio_name, row.municipio):
-                    continue
-                if departamento_norm and _normalize_text(row.departamento) != departamento_norm:
-                    continue
-                fallback_rows.append(row)
-
-            effective_limit = min(limit, LIMIT_CAP)
-            return PuestosPage(
-                total=len(fallback_rows),
-                limit=effective_limit,
-                items=fallback_rows[:effective_limit],
-            )
+        q = q.filter(PuestoORM.municipio_codigo == normalized_municipio_code)
+        if normalized_departamento_codigo:
+            q = q.filter(PuestoORM.departamento_codigo == normalized_departamento_codigo)
 
         effective_limit = min(limit, LIMIT_CAP)
-        return PuestosPage(total=0, limit=effective_limit, items=[])
+        total = q.count()
+        items = q.limit(effective_limit).all()
+        return PuestosPage(
+            total=total,
+            limit=effective_limit,
+            items=[PuestoRead.model_validate(item) for item in items],
+        )
 
     if departamento_codigo:
         q = q.filter(PuestoORM.departamento_codigo == departamento_codigo.strip().zfill(2))
@@ -782,8 +775,6 @@ def analytics_territorio(
                 tipo=normalized_tipo,
                 codigo=normalized_codigo,
                 db=db,
-                departamento_name_by_code=_departamento_name_by_code,
-                municipio_name_by_code=_municipio_name_by_code,
             )
             if recomputed != cached:
                 if cache_available:
@@ -801,8 +792,6 @@ def analytics_territorio(
         tipo=normalized_tipo,
         codigo=normalized_codigo,
         db=db,
-        departamento_name_by_code=_departamento_name_by_code,
-        municipio_name_by_code=_municipio_name_by_code,
     )
     if cache_available:
         try:
@@ -822,23 +811,128 @@ def analytics_territorio(
 
 
 @app.get("/api/v1/geojson/departamentos")
-def get_departamentos_geojson():
-    """Get GeoJSON for Colombia departments."""
-    return load_departamentos_geojson()
+def get_departamentos_geojson(db: Session = Depends(get_db)):
+    """Get GeoJSON for Colombia departments with Excel `dd` codes."""
+    geojson = load_departamentos_geojson()
+    by_norm_name = {
+        _normalize_text(str(row.nombre or "")): str(row.codigo).zfill(2)
+        for row in db.query(TerritorioDepartamentoORM).all()
+        if row.codigo and row.nombre
+    }
+
+    features = []
+    for feature in geojson.get("features", []):
+        props = dict(feature.get("properties", {}))
+        dept_name = str(
+            props.get("departamento_nombre")
+            or props.get("NOMBRE_DPT")
+            or props.get("DPTO_CNMBR")
+            or ""
+        ).strip()
+        dept_norm = _normalize_text(dept_name)
+        excel_code = by_norm_name.get(dept_norm)
+
+        canonical_code = normalize_codigo_territorial(
+            props.get("departamento_codigo")
+            or props.get("canonical_id")
+            or props.get("DPTO")
+            or props.get("DPTO_CCDGO"),
+            2,
+        )
+
+        resolved_code = excel_code or canonical_code
+        if resolved_code:
+            props["excel_id"] = resolved_code
+            props["departamento_codigo"] = resolved_code
+            props["canonical_id"] = resolved_code
+            props["DPTO"] = resolved_code
+            props["DPTO_CCDGO"] = resolved_code
+            if canonical_code and canonical_code != resolved_code:
+                props["source_canonical_id"] = canonical_code
+
+        features.append({
+            "type": "Feature",
+            "properties": props,
+            "geometry": feature.get("geometry"),
+        })
+
+    return {"type": "FeatureCollection", "features": features}
 
 
 @app.get("/api/v1/geojson/municipios")
 def get_municipios_geojson(
     departamento_codigo: str = Query(..., description="Código DANE del departamento (1 o 2 dígitos)"),
+    db: Session = Depends(get_db),
 ):
-    """Get GeoJSON municipalities filtered by department code."""
+    """Get GeoJSON municipalities filtered by Excel `dd` and emitted with Excel `mm`."""
     if not re.fullmatch(r"\d{1,2}", departamento_codigo.strip()):
         raise HTTPException(
             status_code=422,
             detail="departamento_codigo must be numeric with 1 or 2 digits",
         )
-    normalized_code = departamento_codigo.strip().zfill(2)
-    return get_municipios_geojson_by_departamento(normalized_code)
+    requested_dd = departamento_codigo.strip().zfill(2)
+
+    dept_row = db.query(TerritorioDepartamentoORM).filter_by(codigo=requested_dd).first()
+    canonical_by_norm_name = _departamento_code_by_norm_name_from_geojson()
+
+    canonical_dd = requested_dd
+    if dept_row and dept_row.nombre:
+        canonical_dd = canonical_by_norm_name.get(_normalize_text(dept_row.nombre), requested_dd)
+
+    geojson = get_municipios_geojson_by_departamento(canonical_dd)
+
+    municipio_rows = db.query(TerritorioMunicipioORM).filter_by(departamento_codigo=requested_dd).all()
+    mm_by_norm_name = {
+        _normalize_text(str(row.nombre or "")): str(row.codigo).zfill(5)
+        for row in municipio_rows
+        if row.codigo and row.nombre
+    }
+
+    features = []
+    for feature in geojson.get("features", []):
+        props = dict(feature.get("properties", {}))
+        mun_name = str(
+            props.get("municipio_nombre")
+            or props.get("NOMBRE_MPI")
+            or props.get("MPIO_CNMBR")
+            or props.get("nombre")
+            or ""
+        ).strip()
+        mun_norm = _normalize_text(mun_name)
+
+        canonical_mm = normalize_codigo_territorial(
+            props.get("municipio_codigo")
+            or props.get("canonical_id")
+            or props.get("MPIO_CDPMP")
+            or props.get("CODIGO_DANE")
+            or props.get("COD_DANE")
+            or props.get("MPIO"),
+            5,
+        )
+
+        excel_mm = mm_by_norm_name.get(mun_norm)
+        if not excel_mm and canonical_mm:
+            excel_mm = f"{requested_dd}{canonical_mm[-3:]}"
+
+        if excel_mm:
+            props["excel_id"] = excel_mm
+            props["municipio_codigo"] = excel_mm
+            props["canonical_id"] = excel_mm
+            props["MPIO_CDPMP"] = excel_mm
+            if canonical_mm and canonical_mm != excel_mm:
+                props["source_canonical_id"] = canonical_mm
+
+        props["departamento_codigo"] = requested_dd
+        props["DPTO"] = requested_dd
+        props["DPTO_CCDGO"] = requested_dd
+
+        features.append({
+            "type": "Feature",
+            "properties": props,
+            "geometry": feature.get("geometry"),
+        })
+
+    return {"type": "FeatureCollection", "features": features}
 
 
 # ---------------------------------------------------------------------------

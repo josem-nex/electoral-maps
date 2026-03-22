@@ -55,6 +55,54 @@ class JurisdiccionORM(Base):
     )
 
 
+class TerritorioZonaORM(Base):
+    __tablename__ = "territorio_zona"
+
+    codigo: Mapped[str] = mapped_column(String(3), primary_key=True)
+    nombre: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class TerritorioDepartamentoORM(Base):
+    __tablename__ = "territorio_departamento"
+
+    codigo: Mapped[str] = mapped_column(String(2), primary_key=True)
+    nombre: Mapped[str] = mapped_column(String(128), nullable=False)
+    zona_codigo: Mapped[str | None] = mapped_column(ForeignKey("territorio_zona.codigo", ondelete="SET NULL"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    zona = relationship("TerritorioZonaORM")
+
+
+class TerritorioMunicipioORM(Base):
+    __tablename__ = "territorio_municipio"
+
+    codigo: Mapped[str] = mapped_column(String(5), primary_key=True)
+    departamento_codigo: Mapped[str] = mapped_column(ForeignKey("territorio_departamento.codigo", ondelete="CASCADE"), index=True, nullable=False)
+    nombre: Mapped[str] = mapped_column(String(160), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    departamento = relationship("TerritorioDepartamentoORM")
+
+
 class PuestoORM(Base):
     __tablename__ = "puestos_electorales"
 
@@ -67,6 +115,8 @@ class PuestoORM(Base):
     municipio: Mapped[str] = mapped_column(String(128), nullable=False)
     puesto: Mapped[str] = mapped_column(String(256), nullable=False)
     comuna: Mapped[str | None] = mapped_column(String(128))
+    zona_codigo: Mapped[str | None] = mapped_column(String(3), index=True)
+    puesto_codigo: Mapped[str | None] = mapped_column(String(8))
     direccion: Mapped[str | None] = mapped_column(String(256))
     mujeres: Mapped[int | None] = mapped_column(Integer)
     hombres: Mapped[int | None] = mapped_column(Integer)

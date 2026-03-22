@@ -129,3 +129,69 @@ python scripts/refresh_territorial_stats_cache.py
 ```
 
 El comando recalcula y actualiza agregados para país, zonas, departamentos y municipios.
+
+## Corrección de códigos territoriales en DB desde Excel
+
+Si ya tienes datos cargados y necesitas alinear `departamento_codigo` y `municipio_codigo` con el Excel fuente (`INFO_X_Puesto.xlsx`), usa:
+
+```bash
+cd backend
+python scripts/sync_puestos_codes_from_excel.py --dry-run
+python scripts/sync_puestos_codes_from_excel.py
+```
+
+La sincronización cruza por `codigo_puesto`, actualiza códigos en `puestos_electorales` y mantiene el flujo de lectura actual desde base de datos.
+
+## Sincronización de catálogos territoriales (dd/mm/zz)
+
+Para poblar y actualizar catálogos persistentes de departamentos, municipios y zonas desde el Excel:
+
+```bash
+cd backend
+python scripts/sync_territorial_catalogs_from_excel.py --dry-run
+python scripts/sync_territorial_catalogs_from_excel.py
+```
+
+Los endpoints y analytics territoriales usan estos catálogos en runtime, evitando lecturas del Excel por request.
+
+## Checklist de migración y rollback (IDs Excel)
+
+### Migración
+
+1. Ejecutar migraciones:
+
+```bash
+cd backend
+alembic upgrade head
+```
+
+2. Sincronizar catálogos territoriales:
+
+```bash
+python scripts/sync_territorial_catalogs_from_excel.py
+```
+
+3. Reconciliar códigos de puestos:
+
+```bash
+python scripts/sync_puestos_codes_from_excel.py --dry-run
+python scripts/sync_puestos_codes_from_excel.py
+```
+
+4. Regenerar cache territorial:
+
+```bash
+python scripts/refresh_territorial_stats_cache.py
+```
+
+### Rollback
+
+1. Restaurar respaldo de `electoral.db` previo a la migración.
+2. Ejecutar downgrade si aplica:
+
+```bash
+cd backend
+alembic downgrade 20260310_0002
+```
+
+3. Reiniciar backend para limpiar estado de cache en memoria.

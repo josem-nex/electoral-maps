@@ -9,6 +9,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+tl.txt
 .Python
 
 # Jupyter Notebook

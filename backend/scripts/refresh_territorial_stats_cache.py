@@ -9,7 +9,6 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from app.database import SessionLocal
-from app.main import _departamento_name_by_code, _municipio_name_by_code
 from app.territorial_stats_cache import refresh_territorio_stats_cache
 
 
@@ -18,8 +17,6 @@ def main() -> int:
     try:
         counts = refresh_territorio_stats_cache(
             db=db,
-            departamento_name_by_code=_departamento_name_by_code,
-            municipio_name_by_code=_municipio_name_by_code,
         )
         total = sum(counts.values())
         print("✅ Cache territorial refrescada")

@@ -191,12 +191,12 @@ def import_puestos(
                 row_data['departamento_codigo'] = codigo_str[:2]
                 if 'codigo_puesto' in row_data:
                     row_data['codigo_puesto'] = codigo_str
-        
+
         # Si no, construir desde dd + mm
         if not row_data.get('municipio_codigo'):
             dept_cod = str(row_data.get('departamento_codigo', '')).replace('.0', '').strip()
             mun_cod = str(row_data.get('municipio_codigo', '')).replace('.0', '').strip()
-            
+
             if dept_cod and mun_cod:
                 row_data['departamento_codigo'] = dept_cod.zfill(2)
                 row_data['municipio_codigo'] = dept_cod.zfill(2) + mun_cod.zfill(3)
@@ -276,6 +276,16 @@ def import_puestos(
             'municipio': str(row_data.get('municipio', '')).strip() or 'N/A',
             'puesto': str(row_data['puesto']).strip(),
             'comuna': str(row_data.get('comuna', '')).strip() if row_data.get('comuna') else None,
+            'zona_codigo': (
+                str(row_data.get('zona', '')).replace('.0', '').strip().zfill(2)
+                if row_data.get('zona') not in (None, '')
+                else None
+            ),
+            'puesto_codigo': (
+                str(row_data.get('puesto_codigo', '')).replace('.0', '').strip().zfill(2)
+                if row_data.get('puesto_codigo') not in (None, '')
+                else None
+            ),
             'direccion': str(row_data.get('direccion', '')).strip() if row_data.get('direccion') else None,
             'mesas': safe_int(row_data.get('mesas')),
             'mujeres': safe_int(row_data.get('mujeres')),
@@ -312,6 +322,8 @@ def import_puestos(
                     'municipio': stmt.excluded.municipio,
                     'puesto': stmt.excluded.puesto,
                     'comuna': stmt.excluded.comuna,
+                    'zona_codigo': stmt.excluded.zona_codigo,
+                    'puesto_codigo': stmt.excluded.puesto_codigo,
                     'direccion': stmt.excluded.direccion,
                     'mesas': stmt.excluded.mesas,
                     'mujeres': stmt.excluded.mujeres,

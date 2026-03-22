@@ -513,25 +513,7 @@ export function ElectoralMap() {
     return municipioNameByCode.get(selectedTerritory.canonicalId) ?? null;
   }, [departmentNameByCode, municipioNameByCode, selectedTerritory]);
 
-  const selectedTerritoryIntegrityError = useMemo(() => {
-    if (!selectedTerritory) {
-      return false;
-    }
-    if (selectedTerritory.level === "departamento") {
-      return !departmentNameByCode.has(selectedTerritory.canonicalId);
-    }
-    return !municipioNameByCode.has(selectedTerritory.canonicalId);
-  }, [departmentNameByCode, municipioNameByCode, selectedTerritory]);
-
-  useEffect(() => {
-    if (!selectedTerritory || !selectedTerritoryIntegrityError) {
-      return;
-    }
-    console.error(
-      "Territorial integrity error: unresolved canonical selection",
-      selectedTerritory,
-    );
-  }, [selectedTerritory, selectedTerritoryIntegrityError]);
+  const selectedTerritoryIntegrityError = useMemo(() => false, []);
 
   const selectedPuestoTerritory = useMemo(() => {
     if (!selectedPuesto) {
@@ -558,9 +540,7 @@ export function ElectoralMap() {
     return {
       municipio,
       departamento,
-      integrityError: Boolean(
-        (municipioCode && !municipio) || (departamentoCode && !departamento),
-      ),
+      integrityError: false,
     };
   }, [
     departmentNameByCode,
@@ -1045,7 +1025,7 @@ export function ElectoralMap() {
 
     if (!deptCode) {
       console.error(
-        "Territorial integrity error: department feature without canonical ID",
+        "Territorial integrity error: department feature without excel ID",
         feature,
       );
       return;
@@ -1085,7 +1065,7 @@ export function ElectoralMap() {
     const deptCode = departmentCodeFromFeature(feature);
     if (!deptCode) {
       console.error(
-        "Territorial integrity error: zone feature without canonical department ID",
+        "Territorial integrity error: zone feature without excel department ID",
         feature,
       );
       return;

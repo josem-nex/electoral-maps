@@ -1,11 +1,60 @@
 {
   "summary": {
     "catalog_total": 1122,
-    "with_data": 1120,
-    "without_data": 2,
-    "coverage_pct": 99.82
+    "with_data": 1112,
+    "without_data": 10,
+    "coverage_pct": 99.11
   },
   "municipios_vacios": [
+    {
+      "codigo": "05237",
+      "nombre": "DONMATÍAS",
+      "departamento_codigo": "05",
+      "departamento": "ANTIOQUIA",
+      "puestos_count": 0
+    },
+    {
+      "codigo": "13062",
+      "nombre": "ARROYOHONDO",
+      "departamento_codigo": "13",
+      "departamento": "BOLÍVAR",
+      "puestos_count": 0
+    },
+    {
+      "codigo": "13468",
+      "nombre": "SANTA CRUZ DE MOMPOX",
+      "departamento_codigo": "13",
+      "departamento": "BOLÍVAR",
+      "puestos_count": 0
+    },
+    {
+      "codigo": "13600",
+      "nombre": "RÍO VIEJO",
+      "departamento_codigo": "13",
+      "departamento": "BOLÍVAR",
+      "puestos_count": 0
+    },
+    {
+      "codigo": "15407",
+      "nombre": "VILLA DE LEYVA",
+      "departamento_codigo": "15",
+      "departamento": "BOYACÁ",
+      "puestos_count": 0
+    },
+    {
+      "codigo": "19418",
+      "nombre": "LÓPEZ DE MICAY",
+      "departamento_codigo": "19",
+      "departamento": "CAUCA",
+      "puestos_count": 0
+    },
+    {
+      "codigo": "50711",
+      "nombre": "VISTAHERMOSA",
+      "departamento_codigo": "50",
+      "departamento": "META",
+      "puestos_count": 0
+    },
     {
       "codigo": "88001",
       "nombre": "SAN ANDRÉS",
@@ -18,6 +67,13 @@
       "nombre": "PROVIDENCIA",
       "departamento_codigo": "88",
       "departamento": "",
+      "puestos_count": 0
+    },
+    {
+      "codigo": "97777",
+      "nombre": "PAPUNAHUA",
+      "departamento_codigo": "97",
+      "departamento": "VAUPÉS",
       "puestos_count": 0
     }
   ],
@@ -35,6 +91,13 @@
       "departamento_codigo": "05",
       "departamento": "ANTIOQUIA",
       "puestos_count": 250
+    },
+    {
+      "codigo": "76126",
+      "nombre": "CALIMA",
+      "departamento_codigo": "76",
+      "departamento": "VALLE DEL CAUCA",
+      "puestos_count": 235
     },
     {
       "codigo": "52835",
@@ -177,6 +240,20 @@
       "puestos_count": 67
     },
     {
+      "codigo": "70001",
+      "nombre": "SINCELEJO",
+      "departamento_codigo": "70",
+      "departamento": "SUCRE",
+      "puestos_count": 66
+    },
+    {
+      "codigo": "76113",
+      "nombre": "BUGALAGRANDE",
+      "departamento_codigo": "76",
+      "departamento": "VALLE DEL CAUCA",
+      "puestos_count": 66
+    },
+    {
       "codigo": "76834",
       "nombre": "TULUÁ",
       "departamento_codigo": "76",
@@ -202,7 +279,14 @@
       "nombre": "BELLO",
       "departamento_codigo": "05",
       "departamento": "ANTIOQUIA",
-      "puestos_count": 55
+      "puestos_count": 58
+    },
+    {
+      "codigo": "05467",
+      "nombre": "MONTEBELLO",
+      "departamento_codigo": "05",
+      "departamento": "ANTIOQUIA",
+      "puestos_count": 58
     },
     {
       "codigo": "08758",
@@ -231,13 +315,6 @@
       "departamento_codigo": "63",
       "departamento": "QUINDIO",
       "puestos_count": 53
-    },
-    {
-      "codigo": "70001",
-      "nombre": "SINCELEJO",
-      "departamento_codigo": "70",
-      "departamento": "SUCRE",
-      "puestos_count": 52
     },
     {
       "codigo": "18001",
@@ -331,11 +408,18 @@
       "puestos_count": 42
     },
     {
-      "codigo": "19418",
-      "nombre": "LÓPEZ DE MICAY",
-      "departamento_codigo": "19",
-      "departamento": "CAUCA",
-      "puestos_count": 40
+      "codigo": "41548",
+      "nombre": "PITAL",
+      "departamento_codigo": "41",
+      "departamento": "HUILA",
+      "puestos_count": 39
+    },
+    {
+      "codigo": "41551",
+      "nombre": "PITALITO",
+      "departamento_codigo": "41",
+      "departamento": "HUILA",
+      "puestos_count": 39
     },
     {
       "codigo": "68307",
@@ -391,13 +475,6 @@
       "nombre": "FUSAGASUGÁ",
       "departamento_codigo": "25",
       "departamento": "CUNDINAMARCA",
-      "puestos_count": 36
-    },
-    {
-      "codigo": "41551",
-      "nombre": "PITALITO",
-      "departamento_codigo": "41",
-      "departamento": "HUILA",
       "puestos_count": 36
     },
     {
@@ -541,13 +618,6 @@
       "puestos_count": 28
     },
     {
-      "codigo": "13468",
-      "nombre": "SANTA CRUZ DE MOMPOX",
-      "departamento_codigo": "13",
-      "departamento": "BOLÍVAR",
-      "puestos_count": 28
-    },
-    {
       "codigo": "19532",
       "nombre": "PATÍA",
       "departamento_codigo": "19",
@@ -597,20 +667,6 @@
       "puestos_count": 27
     },
     {
-      "codigo": "05034",
-      "nombre": "ANDES",
-      "departamento_codigo": "05",
-      "departamento": "ANTIOQUIA",
-      "puestos_count": 26
-    },
-    {
-      "codigo": "05647",
-      "nombre": "SAN ANDRÉS DE CUERQUÍA",
-      "departamento_codigo": "05",
-      "departamento": "ANTIOQUIA",
-      "puestos_count": 26
-    },
-    {
       "codigo": "13244",
       "nombre": "EL CARMEN DE BOLÍVAR",
       "departamento_codigo": "13",
@@ -641,6 +697,13 @@
     {
       "codigo": "70670",
       "nombre": "SAMPUÉS",
+      "departamento_codigo": "70",
+      "departamento": "SUCRE",
+      "puestos_count": 26
+    },
+    {
+      "codigo": "70823",
+      "nombre": "SAN JOSÉ DE TOLUVIEJO",
       "departamento_codigo": "70",
       "departamento": "SUCRE",
       "puestos_count": 26
@@ -818,13 +881,6 @@
       "nombre": "ZIPAQUIRÁ",
       "departamento_codigo": "25",
       "departamento": "CUNDINAMARCA",
-      "puestos_count": 22
-    },
-    {
-      "codigo": "27150",
-      "nombre": "CARMEN DEL DARIÉN",
-      "departamento_codigo": "27",
-      "departamento": "CHOCÓ",
       "puestos_count": 22
     },
     {
@@ -1143,13 +1199,6 @@
       "puestos_count": 19
     },
     {
-      "codigo": "76126",
-      "nombre": "CALIMA",
-      "departamento_codigo": "76",
-      "departamento": "VALLE DEL CAUCA",
-      "puestos_count": 19
-    },
-    {
       "codigo": "86568",
       "nombre": "PUERTO ASÍS",
       "departamento_codigo": "86",
@@ -1203,13 +1252,6 @@
       "nombre": "MEDIO BAUDÓ",
       "departamento_codigo": "27",
       "departamento": "CHOCÓ",
-      "puestos_count": 18
-    },
-    {
-      "codigo": "41396",
-      "nombre": "LA PLATA",
-      "departamento_codigo": "41",
-      "departamento": "HUILA",
       "puestos_count": 18
     },
     {
@@ -1283,6 +1325,13 @@
       "puestos_count": 18
     },
     {
+      "codigo": "05034",
+      "nombre": "ANDES",
+      "departamento_codigo": "05",
+      "departamento": "ANTIOQUIA",
+      "puestos_count": 17
+    },
+    {
       "codigo": "05887",
       "nombre": "YARUMAL",
       "departamento_codigo": "05",
@@ -1327,6 +1376,13 @@
     {
       "codigo": "27077",
       "nombre": "BAJO BAUDÓ",
+      "departamento_codigo": "27",
+      "departamento": "CHOCÓ",
+      "puestos_count": 17
+    },
+    {
+      "codigo": "27150",
+      "nombre": "CARMEN DEL DARIÉN",
       "departamento_codigo": "27",
       "departamento": "CHOCÓ",
       "puestos_count": 17
@@ -1427,6 +1483,13 @@
       "nombre": "PUERTO LIBERTADOR",
       "departamento_codigo": "23",
       "departamento": "CÓRDOBA",
+      "puestos_count": 16
+    },
+    {
+      "codigo": "41396",
+      "nombre": "LA PLATA",
+      "departamento_codigo": "41",
+      "departamento": "HUILA",
       "puestos_count": 16
     },
     {
@@ -1570,6 +1633,20 @@
       "puestos_count": 15
     },
     {
+      "codigo": "68245",
+      "nombre": "EL GUACAMAYO",
+      "departamento_codigo": "68",
+      "departamento": "SANTANDER",
+      "puestos_count": 15
+    },
+    {
+      "codigo": "68318",
+      "nombre": "GUACA",
+      "departamento_codigo": "68",
+      "departamento": "SANTANDER",
+      "puestos_count": 15
+    },
+    {
       "codigo": "68572",
       "nombre": "PUENTE NACIONAL",
       "departamento_codigo": "68",
@@ -1584,22 +1661,8 @@
       "puestos_count": 15
     },
     {
-      "codigo": "70823",
-      "nombre": "SAN JOSÉ DE TOLUVIEJO",
-      "departamento_codigo": "70",
-      "departamento": "SUCRE",
-      "puestos_count": 15
-    },
-    {
       "codigo": "76100",
       "nombre": "BOLÍVAR",
-      "departamento_codigo": "76",
-      "departamento": "VALLE DEL CAUCA",
-      "puestos_count": 15
-    },
-    {
-      "codigo": "76113",
-      "nombre": "BUGALAGRANDE",
       "departamento_codigo": "76",
       "departamento": "VALLE DEL CAUCA",
       "puestos_count": 15
@@ -1787,20 +1850,6 @@
       "puestos_count": 14
     },
     {
-      "codigo": "54518",
-      "nombre": "PAMPLONA",
-      "departamento_codigo": "54",
-      "departamento": "NORTE DE SANTANDER",
-      "puestos_count": 14
-    },
-    {
-      "codigo": "54520",
-      "nombre": "PAMPLONITA",
-      "departamento_codigo": "54",
-      "departamento": "NORTE DE SANTANDER",
-      "puestos_count": 14
-    },
-    {
       "codigo": "70233",
       "nombre": "EL ROBLE",
       "departamento_codigo": "70",
@@ -1957,13 +2006,6 @@
     {
       "codigo": "68255",
       "nombre": "EL PLAYÓN",
-      "departamento_codigo": "68",
-      "departamento": "SANTANDER",
-      "puestos_count": 13
-    },
-    {
-      "codigo": "68318",
-      "nombre": "GUACA",
       "departamento_codigo": "68",
       "departamento": "SANTANDER",
       "puestos_count": 13
@@ -2172,6 +2214,13 @@
       "puestos_count": 12
     },
     {
+      "codigo": "54518",
+      "nombre": "PAMPLONA",
+      "departamento_codigo": "54",
+      "departamento": "NORTE DE SANTANDER",
+      "puestos_count": 12
+    },
+    {
       "codigo": "68468",
       "nombre": "MOLAGAVITA",
       "departamento_codigo": "68",
@@ -2361,13 +2410,6 @@
       "puestos_count": 11
     },
     {
-      "codigo": "50711",
-      "nombre": "VISTAHERMOSA",
-      "departamento_codigo": "50",
-      "departamento": "META",
-      "puestos_count": 11
-    },
-    {
       "codigo": "52381",
       "nombre": "LA FLORIDA",
       "departamento_codigo": "52",
@@ -2498,6 +2540,20 @@
       "nombre": "NOROSÍ",
       "departamento_codigo": "13",
       "departamento": "BOLÍVAR",
+      "puestos_count": 10
+    },
+    {
+      "codigo": "15183",
+      "nombre": "CHITA",
+      "departamento_codigo": "15",
+      "departamento": "BOYACÁ",
+      "puestos_count": 10
+    },
+    {
+      "codigo": "15185",
+      "nombre": "CHITARAQUE",
+      "departamento_codigo": "15",
+      "departamento": "BOYACÁ",
       "puestos_count": 10
     },
     {
@@ -2690,36 +2746,8 @@
       "puestos_count": 10
     },
     {
-      "codigo": "68264",
-      "nombre": "ENCINO",
-      "departamento_codigo": "68",
-      "departamento": "SANTANDER",
-      "puestos_count": 10
-    },
-    {
-      "codigo": "68266",
-      "nombre": "ENCISO",
-      "departamento_codigo": "68",
-      "departamento": "SANTANDER",
-      "puestos_count": 10
-    },
-    {
       "codigo": "68296",
       "nombre": "GALÁN",
-      "departamento_codigo": "68",
-      "departamento": "SANTANDER",
-      "puestos_count": 10
-    },
-    {
-      "codigo": "68770",
-      "nombre": "SUAITA",
-      "departamento_codigo": "68",
-      "departamento": "SANTANDER",
-      "puestos_count": 10
-    },
-    {
-      "codigo": "68780",
-      "nombre": "SURATÁ",
       "departamento_codigo": "68",
       "departamento": "SANTANDER",
       "puestos_count": 10
@@ -2811,6 +2839,13 @@
     {
       "codigo": "05604",
       "nombre": "REMEDIOS",
+      "departamento_codigo": "05",
+      "departamento": "ANTIOQUIA",
+      "puestos_count": 9
+    },
+    {
+      "codigo": "05647",
+      "nombre": "SAN ANDRÉS DE CUERQUÍA",
       "departamento_codigo": "05",
       "departamento": "ANTIOQUIA",
       "puestos_count": 9
@@ -3208,20 +3243,6 @@
       "puestos_count": 8
     },
     {
-      "codigo": "15183",
-      "nombre": "CHITA",
-      "departamento_codigo": "15",
-      "departamento": "BOYACÁ",
-      "puestos_count": 8
-    },
-    {
-      "codigo": "15187",
-      "nombre": "CHIVATÁ",
-      "departamento_codigo": "15",
-      "departamento": "BOYACÁ",
-      "puestos_count": 8
-    },
-    {
       "codigo": "15632",
       "nombre": "SABOYÁ",
       "departamento_codigo": "15",
@@ -3355,20 +3376,6 @@
       "puestos_count": 8
     },
     {
-      "codigo": "50150",
-      "nombre": "CASTILLA LA NUEVA",
-      "departamento_codigo": "50",
-      "departamento": "META",
-      "puestos_count": 8
-    },
-    {
-      "codigo": "50251",
-      "nombre": "EL CASTILLO",
-      "departamento_codigo": "50",
-      "departamento": "META",
-      "puestos_count": 8
-    },
-    {
       "codigo": "50325",
       "nombre": "MAPIRIPÁN",
       "departamento_codigo": "50",
@@ -3439,15 +3446,15 @@
       "puestos_count": 8
     },
     {
-      "codigo": "68464",
-      "nombre": "MOGOTES",
+      "codigo": "68266",
+      "nombre": "ENCISO",
       "departamento_codigo": "68",
       "departamento": "SANTANDER",
       "puestos_count": 8
     },
     {
-      "codigo": "68524",
-      "nombre": "PALMAS DEL SOCORRO",
+      "codigo": "68464",
+      "nombre": "MOGOTES",
       "departamento_codigo": "68",
       "departamento": "SANTANDER",
       "puestos_count": 8
@@ -3621,13 +3628,6 @@
       "puestos_count": 7
     },
     {
-      "codigo": "13600",
-      "nombre": "RÍO VIEJO",
-      "departamento_codigo": "13",
-      "departamento": "BOLÍVAR",
-      "puestos_count": 7
-    },
-    {
       "codigo": "13667",
       "nombre": "SAN MARTÍN DE LOBA",
       "departamento_codigo": "13",
@@ -3730,13 +3730,6 @@
       "nombre": "LA PAZ",
       "departamento_codigo": "20",
       "departamento": "CESAR",
-      "puestos_count": 7
-    },
-    {
-      "codigo": "25297",
-      "nombre": "GACHETÁ",
-      "departamento_codigo": "25",
-      "departamento": "CUNDINAMARCA",
       "puestos_count": 7
     },
     {
@@ -4055,13 +4048,6 @@
       "puestos_count": 6
     },
     {
-      "codigo": "13062",
-      "nombre": "ARROYOHONDO",
-      "departamento_codigo": "13",
-      "departamento": "BOLÍVAR",
-      "puestos_count": 6
-    },
-    {
       "codigo": "13140",
       "nombre": "CALAMAR",
       "departamento_codigo": "13",
@@ -4174,15 +4160,22 @@
       "puestos_count": 6
     },
     {
-      "codigo": "25317",
-      "nombre": "GUACHETÁ",
+      "codigo": "25758",
+      "nombre": "SOPÓ",
       "departamento_codigo": "25",
       "departamento": "CUNDINAMARCA",
       "puestos_count": 6
     },
     {
-      "codigo": "25758",
-      "nombre": "SOPÓ",
+      "codigo": "25781",
+      "nombre": "SUTATAUSA",
+      "departamento_codigo": "25",
+      "departamento": "CUNDINAMARCA",
+      "puestos_count": 6
+    },
+    {
+      "codigo": "25793",
+      "nombre": "TAUSA",
       "departamento_codigo": "25",
       "departamento": "CUNDINAMARCA",
       "puestos_count": 6
@@ -4393,6 +4386,13 @@
     {
       "codigo": "68502",
       "nombre": "ONZAGA",
+      "departamento_codigo": "68",
+      "departamento": "SANTANDER",
+      "puestos_count": 6
+    },
+    {
+      "codigo": "68524",
+      "nombre": "PALMAS DEL SOCORRO",
       "departamento_codigo": "68",
       "departamento": "SANTANDER",
       "puestos_count": 6
@@ -4699,29 +4699,8 @@
       "puestos_count": 5
     },
     {
-      "codigo": "25328",
-      "nombre": "GUAYABAL DE SÍQUIMA",
-      "departamento_codigo": "25",
-      "departamento": "CUNDINAMARCA",
-      "puestos_count": 5
-    },
-    {
-      "codigo": "25335",
-      "nombre": "GUAYABETAL",
-      "departamento_codigo": "25",
-      "departamento": "CUNDINAMARCA",
-      "puestos_count": 5
-    },
-    {
       "codigo": "25394",
       "nombre": "LA PALMA",
-      "departamento_codigo": "25",
-      "departamento": "CUNDINAMARCA",
-      "puestos_count": 5
-    },
-    {
-      "codigo": "25426",
-      "nombre": "MACHETÁ",
       "departamento_codigo": "25",
       "departamento": "CUNDINAMARCA",
       "puestos_count": 5
@@ -4986,6 +4965,20 @@
       "puestos_count": 5
     },
     {
+      "codigo": "68770",
+      "nombre": "SUAITA",
+      "departamento_codigo": "68",
+      "departamento": "SANTANDER",
+      "puestos_count": 5
+    },
+    {
+      "codigo": "68780",
+      "nombre": "SURATÁ",
+      "departamento_codigo": "68",
+      "departamento": "SANTANDER",
+      "puestos_count": 5
+    },
+    {
       "codigo": "70221",
       "nombre": "COVEÑAS",
       "departamento_codigo": "70",
@@ -5217,20 +5210,6 @@
       "puestos_count": 4
     },
     {
-      "codigo": "15464",
-      "nombre": "MONGUA",
-      "departamento_codigo": "15",
-      "departamento": "BOYACÁ",
-      "puestos_count": 4
-    },
-    {
-      "codigo": "15466",
-      "nombre": "MONGUÍ",
-      "departamento_codigo": "15",
-      "departamento": "BOYACÁ",
-      "puestos_count": 4
-    },
-    {
       "codigo": "15600",
       "nombre": "RÁQUIRA",
       "departamento_codigo": "15",
@@ -5247,6 +5226,20 @@
     {
       "codigo": "15804",
       "nombre": "TIBANÁ",
+      "departamento_codigo": "15",
+      "departamento": "BOYACÁ",
+      "puestos_count": 4
+    },
+    {
+      "codigo": "15837",
+      "nombre": "TUTA",
+      "departamento_codigo": "15",
+      "departamento": "BOYACÁ",
+      "puestos_count": 4
+    },
+    {
+      "codigo": "15839",
+      "nombre": "TUTAZÁ",
       "departamento_codigo": "15",
       "departamento": "BOYACÁ",
       "puestos_count": 4
@@ -5343,15 +5336,15 @@
       "puestos_count": 4
     },
     {
-      "codigo": "25372",
-      "nombre": "JUNÍN",
+      "codigo": "25297",
+      "nombre": "GACHETÁ",
       "departamento_codigo": "25",
       "departamento": "CUNDINAMARCA",
       "puestos_count": 4
     },
     {
-      "codigo": "25491",
-      "nombre": "NOCAIMA",
+      "codigo": "25372",
+      "nombre": "JUNÍN",
       "departamento_codigo": "25",
       "departamento": "CUNDINAMARCA",
       "puestos_count": 4
@@ -5399,22 +5392,8 @@
       "puestos_count": 4
     },
     {
-      "codigo": "25793",
-      "nombre": "TAUSA",
-      "departamento_codigo": "25",
-      "departamento": "CUNDINAMARCA",
-      "puestos_count": 4
-    },
-    {
       "codigo": "25799",
       "nombre": "TENJO",
-      "departamento_codigo": "25",
-      "departamento": "CUNDINAMARCA",
-      "puestos_count": 4
-    },
-    {
-      "codigo": "25815",
-      "nombre": "TOCAIMA",
       "departamento_codigo": "25",
       "departamento": "CUNDINAMARCA",
       "puestos_count": 4
@@ -5485,6 +5464,20 @@
     {
       "codigo": "50124",
       "nombre": "CABUYARO",
+      "departamento_codigo": "50",
+      "departamento": "META",
+      "puestos_count": 4
+    },
+    {
+      "codigo": "50150",
+      "nombre": "CASTILLA LA NUEVA",
+      "departamento_codigo": "50",
+      "departamento": "META",
+      "puestos_count": 4
+    },
+    {
+      "codigo": "50251",
+      "nombre": "EL CASTILLO",
       "departamento_codigo": "50",
       "departamento": "META",
       "puestos_count": 4
@@ -5728,13 +5721,6 @@
       "puestos_count": 3
     },
     {
-      "codigo": "05237",
-      "nombre": "DONMATÍAS",
-      "departamento_codigo": "05",
-      "departamento": "ANTIOQUIA",
-      "puestos_count": 3
-    },
-    {
       "codigo": "05306",
       "nombre": "GIRALDO",
       "departamento_codigo": "05",
@@ -5765,13 +5751,6 @@
     {
       "codigo": "05400",
       "nombre": "LA UNIÓN",
-      "departamento_codigo": "05",
-      "departamento": "ANTIOQUIA",
-      "puestos_count": 3
-    },
-    {
-      "codigo": "05467",
-      "nombre": "MONTEBELLO",
       "departamento_codigo": "05",
       "departamento": "ANTIOQUIA",
       "puestos_count": 3
@@ -5854,8 +5833,8 @@
       "puestos_count": 3
     },
     {
-      "codigo": "15185",
-      "nombre": "CHITARAQUE",
+      "codigo": "15232",
+      "nombre": "CHÍQUIZA",
       "departamento_codigo": "15",
       "departamento": "BOYACÁ",
       "puestos_count": 3
@@ -5863,6 +5842,13 @@
     {
       "codigo": "15272",
       "nombre": "FIRAVITOBA",
+      "departamento_codigo": "15",
+      "departamento": "BOYACÁ",
+      "puestos_count": 3
+    },
+    {
+      "codigo": "15362",
+      "nombre": "IZA",
       "departamento_codigo": "15",
       "departamento": "BOYACÁ",
       "puestos_count": 3
@@ -5891,6 +5877,13 @@
     {
       "codigo": "15425",
       "nombre": "MACANAL",
+      "departamento_codigo": "15",
+      "departamento": "BOYACÁ",
+      "puestos_count": 3
+    },
+    {
+      "codigo": "15464",
+      "nombre": "MONGUA",
       "departamento_codigo": "15",
       "departamento": "BOYACÁ",
       "puestos_count": 3
@@ -6078,6 +6071,13 @@
       "puestos_count": 3
     },
     {
+      "codigo": "25328",
+      "nombre": "GUAYABAL DE SÍQUIMA",
+      "departamento_codigo": "25",
+      "departamento": "CUNDINAMARCA",
+      "puestos_count": 3
+    },
+    {
       "codigo": "25398",
       "nombre": "LA PEÑA",
       "departamento_codigo": "25",
@@ -6134,6 +6134,13 @@
       "puestos_count": 3
     },
     {
+      "codigo": "25815",
+      "nombre": "TOCAIMA",
+      "departamento_codigo": "25",
+      "departamento": "CUNDINAMARCA",
+      "puestos_count": 3
+    },
+    {
       "codigo": "25823",
       "nombre": "TOPAIPÍ",
       "departamento_codigo": "25",
@@ -6164,13 +6171,6 @@
     {
       "codigo": "41319",
       "nombre": "GUADALUPE",
-      "departamento_codigo": "41",
-      "departamento": "HUILA",
-      "puestos_count": 3
-    },
-    {
-      "codigo": "41548",
-      "nombre": "PITAL",
       "departamento_codigo": "41",
       "departamento": "HUILA",
       "puestos_count": 3
@@ -6297,13 +6297,6 @@
     {
       "codigo": "68370",
       "nombre": "JORDÁN",
-      "departamento_codigo": "68",
-      "departamento": "SANTANDER",
-      "puestos_count": 3
-    },
-    {
-      "codigo": "68522",
-      "nombre": "PALMAR",
       "departamento_codigo": "68",
       "departamento": "SANTANDER",
       "puestos_count": 3
@@ -6491,13 +6484,6 @@
       "puestos_count": 2
     },
     {
-      "codigo": "15232",
-      "nombre": "CHÍQUIZA",
-      "departamento_codigo": "15",
-      "departamento": "BOYACÁ",
-      "puestos_count": 2
-    },
-    {
       "codigo": "15236",
       "nombre": "CHIVOR",
       "departamento_codigo": "15",
@@ -6535,13 +6521,6 @@
     {
       "codigo": "15377",
       "nombre": "LABRANZAGRANDE",
-      "departamento_codigo": "15",
-      "departamento": "BOYACÁ",
-      "puestos_count": 2
-    },
-    {
-      "codigo": "15407",
-      "nombre": "VILLA DE LEYVA",
       "departamento_codigo": "15",
       "departamento": "BOYACÁ",
       "puestos_count": 2
@@ -6617,8 +6596,36 @@
       "puestos_count": 2
     },
     {
+      "codigo": "15762",
+      "nombre": "SORA",
+      "departamento_codigo": "15",
+      "departamento": "BOYACÁ",
+      "puestos_count": 2
+    },
+    {
       "codigo": "15763",
       "nombre": "SOTAQUIRÁ",
+      "departamento_codigo": "15",
+      "departamento": "BOYACÁ",
+      "puestos_count": 2
+    },
+    {
+      "codigo": "15764",
+      "nombre": "SORACÁ",
+      "departamento_codigo": "15",
+      "departamento": "BOYACÁ",
+      "puestos_count": 2
+    },
+    {
+      "codigo": "15778",
+      "nombre": "SUTATENZA",
+      "departamento_codigo": "15",
+      "departamento": "BOYACÁ",
+      "puestos_count": 2
+    },
+    {
+      "codigo": "15798",
+      "nombre": "TENZA",
       "departamento_codigo": "15",
       "departamento": "BOYACÁ",
       "puestos_count": 2
@@ -6640,20 +6647,6 @@
     {
       "codigo": "15820",
       "nombre": "TÓPAGA",
-      "departamento_codigo": "15",
-      "departamento": "BOYACÁ",
-      "puestos_count": 2
-    },
-    {
-      "codigo": "15837",
-      "nombre": "TUTA",
-      "departamento_codigo": "15",
-      "departamento": "BOYACÁ",
-      "puestos_count": 2
-    },
-    {
-      "codigo": "15839",
-      "nombre": "TUTAZÁ",
       "departamento_codigo": "15",
       "departamento": "BOYACÁ",
       "puestos_count": 2
@@ -6729,8 +6722,22 @@
       "puestos_count": 2
     },
     {
+      "codigo": "25317",
+      "nombre": "GUACHETÁ",
+      "departamento_codigo": "25",
+      "departamento": "CUNDINAMARCA",
+      "puestos_count": 2
+    },
+    {
       "codigo": "25322",
       "nombre": "GUASCA",
+      "departamento_codigo": "25",
+      "departamento": "CUNDINAMARCA",
+      "puestos_count": 2
+    },
+    {
+      "codigo": "25335",
+      "nombre": "GUAYABETAL",
       "departamento_codigo": "25",
       "departamento": "CUNDINAMARCA",
       "puestos_count": 2
@@ -6780,13 +6787,6 @@
     {
       "codigo": "25736",
       "nombre": "SESQUILÉ",
-      "departamento_codigo": "25",
-      "departamento": "CUNDINAMARCA",
-      "puestos_count": 2
-    },
-    {
-      "codigo": "25781",
-      "nombre": "SUTATAUSA",
       "departamento_codigo": "25",
       "departamento": "CUNDINAMARCA",
       "puestos_count": 2
@@ -6939,6 +6939,13 @@
       "puestos_count": 2
     },
     {
+      "codigo": "54520",
+      "nombre": "PAMPLONITA",
+      "departamento_codigo": "54",
+      "departamento": "NORTE DE SANTANDER",
+      "puestos_count": 2
+    },
+    {
       "codigo": "54871",
       "nombre": "VILLA CARO",
       "departamento_codigo": "54",
@@ -6988,8 +6995,8 @@
       "puestos_count": 2
     },
     {
-      "codigo": "68245",
-      "nombre": "EL GUACAMAYO",
+      "codigo": "68264",
+      "nombre": "ENCINO",
       "departamento_codigo": "68",
       "departamento": "SANTANDER",
       "puestos_count": 2
@@ -7004,6 +7011,13 @@
     {
       "codigo": "68344",
       "nombre": "HATO",
+      "departamento_codigo": "68",
+      "departamento": "SANTANDER",
+      "puestos_count": 2
+    },
+    {
+      "codigo": "68522",
+      "nombre": "PALMAR",
       "departamento_codigo": "68",
       "departamento": "SANTANDER",
       "puestos_count": 2
@@ -7067,13 +7081,6 @@
     {
       "codigo": "97161",
       "nombre": "CARURÚ",
-      "departamento_codigo": "97",
-      "departamento": "VAUPÉS",
-      "puestos_count": 2
-    },
-    {
-      "codigo": "97777",
-      "nombre": "PAPUNAHUA",
       "departamento_codigo": "97",
       "departamento": "VAUPÉS",
       "puestos_count": 2
@@ -7226,6 +7233,13 @@
       "puestos_count": 1
     },
     {
+      "codigo": "15187",
+      "nombre": "CHIVATÁ",
+      "departamento_codigo": "15",
+      "departamento": "BOYACÁ",
+      "puestos_count": 1
+    },
+    {
       "codigo": "15189",
       "nombre": "CIÉNEGA",
       "departamento_codigo": "15",
@@ -7268,13 +7282,6 @@
       "puestos_count": 1
     },
     {
-      "codigo": "15362",
-      "nombre": "IZA",
-      "departamento_codigo": "15",
-      "departamento": "BOYACÁ",
-      "puestos_count": 1
-    },
-    {
       "codigo": "15367",
       "nombre": "JENESANO",
       "departamento_codigo": "15",
@@ -7284,6 +7291,13 @@
     {
       "codigo": "15380",
       "nombre": "LA CAPILLA",
+      "departamento_codigo": "15",
+      "departamento": "BOYACÁ",
+      "puestos_count": 1
+    },
+    {
+      "codigo": "15466",
+      "nombre": "MONGUÍ",
       "departamento_codigo": "15",
       "departamento": "BOYACÁ",
       "puestos_count": 1
@@ -7380,20 +7394,6 @@
       "puestos_count": 1
     },
     {
-      "codigo": "15762",
-      "nombre": "SORA",
-      "departamento_codigo": "15",
-      "departamento": "BOYACÁ",
-      "puestos_count": 1
-    },
-    {
-      "codigo": "15764",
-      "nombre": "SORACÁ",
-      "departamento_codigo": "15",
-      "departamento": "BOYACÁ",
-      "puestos_count": 1
-    },
-    {
       "codigo": "15776",
       "nombre": "SUTAMARCHÁN",
       "departamento_codigo": "15",
@@ -7401,22 +7401,8 @@
       "puestos_count": 1
     },
     {
-      "codigo": "15778",
-      "nombre": "SUTATENZA",
-      "departamento_codigo": "15",
-      "departamento": "BOYACÁ",
-      "puestos_count": 1
-    },
-    {
       "codigo": "15790",
       "nombre": "TASCO",
-      "departamento_codigo": "15",
-      "departamento": "BOYACÁ",
-      "puestos_count": 1
-    },
-    {
-      "codigo": "15798",
-      "nombre": "TENZA",
       "departamento_codigo": "15",
       "departamento": "BOYACÁ",
       "puestos_count": 1
@@ -7534,6 +7520,13 @@
       "puestos_count": 1
     },
     {
+      "codigo": "25426",
+      "nombre": "MACHETÁ",
+      "departamento_codigo": "25",
+      "departamento": "CUNDINAMARCA",
+      "puestos_count": 1
+    },
+    {
       "codigo": "25436",
       "nombre": "MANTA",
       "departamento_codigo": "25",
@@ -7543,6 +7536,13 @@
     {
       "codigo": "25483",
       "nombre": "NARIÑO",
+      "departamento_codigo": "25",
+      "departamento": "CUNDINAMARCA",
+      "puestos_count": 1
+    },
+    {
+      "codigo": "25491",
+      "nombre": "NOCAIMA",
       "departamento_codigo": "25",
       "departamento": "CUNDINAMARCA",
       "puestos_count": 1

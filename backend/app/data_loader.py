@@ -387,6 +387,10 @@ def load_municipios_divipola() -> pd.DataFrame:
 def load_puestos_electorales() -> pd.DataFrame:
     """Load electoral voting locations."""
     puestos_path = settings.data_dir / "usar" / "INFO_X_Puesto.xlsx"
+    if not puestos_path.exists():
+        alternative = settings.data_dir / "usar" / "INFO_X_Puestos.xlsx"
+        if alternative.exists():
+            puestos_path = alternative
     df = pd.read_excel(puestos_path, sheet_name="Pre-Divipole", header=7)
     
     df = df.rename(columns={

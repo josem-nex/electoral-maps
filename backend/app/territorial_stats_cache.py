@@ -2,100 +2,34 @@
 from __future__ import annotations
 
 import re
-from difflib import SequenceMatcher
-from typing import Callable
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.data_loader import build_departamentos_catalog, build_municipios_catalog, normalize_text
-from app.db_models import PuestoORM, TerritorioStatsCacheORM
+from app.data_loader import normalize_text
+from app.db_models import (
+    PuestoORM,
+    TerritorioDepartamentoORM,
+    TerritorioMunicipioORM,
+    TerritorioStatsCacheORM,
+    TerritorioZonaORM,
+)
 
 VALID_TERRITORIO_TIPOS = {"pais", "zona", "departamento", "municipio"}
-SPECIAL_DEPARTAMENTO_CODES_ALLOW_EXACT_FALLBACK = {"88"}
-MUNICIPIO_NOISE_TOKENS = {
-    "DE",
-    "DEL",
-    "LA",
-    "LAS",
-    "LOS",
-    "EL",
-    "SAN",
-    "SANTA",
-    "SANTO",
-    "SANTIAGO",
-    "VILLA",
-    "CIUDAD",
-    "DISTRITO",
-    "GUADALAJARA",
-    "CRUZ",
-    "JOSE",
-    "DIEGO",
-    "LUIS",
-}
 
 
 def _normalize_text(value: str | None) -> str:
     return normalize_text(value)
 
 
-def _normalize_municipio_name(value: str | None) -> str:
-    if value is None:
-        return ""
-    base = str(value).replace("(", " ").replace(")", " ")
-    return _normalize_text(base)
-
-
-def _municipio_informative_tokens(value: str | None) -> set[str]:
-    return {
-        token
-        for token in _normalize_municipio_name(value).split()
-        if len(token) >= 4 and token not in MUNICIPIO_NOISE_TOKENS
-    }
-
-
 def _municipio_names_match(expected_name: str | None, candidate_name: str | None) -> bool:
-    expected = _normalize_municipio_name(expected_name)
-    candidate = _normalize_municipio_name(candidate_name)
-
+    expected = _normalize_text(expected_name)
+    candidate = _normalize_text(candidate_name)
     if not expected or not candidate:
         return False
     if expected == candidate:
         return True
-
-    if expected.startswith(candidate) or candidate.startswith(expected):
-        shorter = expected if len(expected) <= len(candidate) else candidate
-        if len(shorter) >= 6:
-            return True
-
-    expected_tokens = expected.split()
-    candidate_tokens = candidate.split()
-    if len(expected_tokens) == 1 and expected_tokens[0] in candidate_tokens:
-        if len(expected_tokens[0]) >= 6:
-            return True
-    if len(candidate_tokens) == 1 and candidate_tokens[0] in expected_tokens:
-        if len(candidate_tokens[0]) >= 6:
-            return True
-
-    expected_info = _municipio_informative_tokens(expected_name)
-    candidate_info = _municipio_informative_tokens(candidate_name)
-    if expected_info and candidate_info:
-        if expected_info.issubset(candidate_info) or candidate_info.issubset(expected_info):
-            return True
-
-        if len(expected_info) == 1 or len(candidate_info) == 1:
-            for expected_token in expected_info:
-                for candidate_token in candidate_info:
-                    if min(len(expected_token), len(candidate_token)) < 5:
-                        continue
-                    similarity = SequenceMatcher(None, expected_token, candidate_token).ratio()
-                    if similarity >= 0.83:
-                        return True
-
-    compact_expected = expected.replace(" ", "")
-    compact_candidate = candidate.replace(" ", "")
-    similarity = SequenceMatcher(None, compact_expected, compact_candidate).ratio()
-    return similarity >= 0.9
+    return expected in candidate or candidate in expected
 
 
 def aggregate_rows(rows: list[PuestoORM]) -> dict[str, int]:
@@ -133,7 +67,8 @@ def normalize_tipo_codigo(tipo: str, codigo: str) -> tuple[str, str]:
     if normalized_tipo == "zona":
         if not re.fullmatch(r"\d{1,3}", raw_code):
             raise ValueError("Para tipo=zona, codigo debe ser numérico de 1 a 3 dígitos")
-        return normalized_tipo, str(int(raw_code))
+        zone_digits = str(int(raw_code))
+        return normalized_tipo, zone_digits.zfill(2) if len(zone_digits) <= 2 else zone_digits
 
     if normalized_tipo == "departamento":
         if not re.fullmatch(r"\d{1,2}", raw_code):
@@ -180,13 +115,49 @@ def upsert_territorio_stats_cache(db: Session, payload: dict) -> None:
     row.hombres_sum = payload["hombres_sum"]
 
 
+def _departamento_name_by_code(db: Session) -> dict[str, str]:
+    return {
+        str(row.codigo).zfill(2): str(row.nombre).strip()
+        for row in db.query(TerritorioDepartamentoORM).all()
+        if row.codigo
+    }
+
+
+def _municipio_name_by_code(db: Session) -> dict[str, str]:
+    return {
+        str(row.codigo).zfill(5): str(row.nombre).strip()
+        for row in db.query(TerritorioMunicipioORM).all()
+        if row.codigo
+    }
+
+
+def _zona_name_by_code(db: Session) -> dict[str, str]:
+    return {
+        str(row.codigo).zfill(2): str(row.nombre).strip()
+        for row in db.query(TerritorioZonaORM).all()
+        if row.codigo
+    }
+
+
+def _departments_by_zone(db: Session) -> dict[str, set[str]]:
+    mapping: dict[str, set[str]] = {}
+    for row in db.query(TerritorioDepartamentoORM).all():
+        if not row.zona_codigo:
+            continue
+        zone_code = str(row.zona_codigo).zfill(2)
+        mapping.setdefault(zone_code, set()).add(str(row.codigo).zfill(2))
+    return mapping
+
+
 def compute_territorio_analytics(
     tipo: str,
     codigo: str,
     db: Session,
-    departamento_name_by_code: Callable[[], dict[str, str]],
-    municipio_name_by_code: Callable[[str], str | None],
 ) -> dict:
+    departamento_names = _departamento_name_by_code(db)
+    municipio_names = _municipio_name_by_code(db)
+    zona_names = _zona_name_by_code(db)
+
     if tipo == "pais":
         rows = db.query(PuestoORM).all()
         return {
@@ -197,100 +168,47 @@ def compute_territorio_analytics(
         }
 
     if tipo == "zona":
-        zone_id = int(codigo)
-        _, departamentos = build_departamentos_catalog()
-        zone_departamentos = [d for d in departamentos if (d.zone_id or 0) == zone_id]
-
-        if not zone_departamentos:
+        zone_code = codigo.zfill(2) if len(codigo) <= 2 else codigo
+        departments_by_zone = _departments_by_zone(db)
+        dept_codes = departments_by_zone.get(zone_code, set())
+        if not dept_codes:
             return {
                 "tipo": "zona",
-                "codigo": codigo,
-                "nombre": f"Zona {zone_id}",
+                "codigo": zone_code,
+                "nombre": zona_names.get(zone_code) or f"Zona {int(zone_code)}",
                 **aggregate_rows([]),
             }
-
-        zone_name = next(
-            (
-                (dept.zone_name or "").strip()
-                for dept in zone_departamentos
-                if (dept.zone_name or "").strip()
-            ),
-            f"Zona {zone_id}",
-        )
-        departamento_names_norm = {_normalize_text(dept.name) for dept in zone_departamentos}
-        rows = [
-            row
-            for row in db.query(PuestoORM).all()
-            if _normalize_text(row.departamento) in departamento_names_norm
-        ]
+        rows = db.query(PuestoORM).filter(PuestoORM.departamento_codigo.in_(dept_codes)).all()
         return {
             "tipo": "zona",
-            "codigo": codigo,
-            "nombre": zone_name,
+            "codigo": zone_code,
+            "nombre": zona_names.get(zone_code) or f"Zona {int(zone_code)}",
             **aggregate_rows(rows),
         }
 
     if tipo == "departamento":
-        nombre = departamento_name_by_code().get(codigo)
-        nombre_norm = _normalize_text(nombre) if nombre else None
-        exact_rows = db.query(PuestoORM).filter(PuestoORM.departamento_codigo == codigo).all()
-        used_special_exact_fallback = False
-
-        if nombre_norm:
-            matched_exact_rows = [
-                r for r in exact_rows if _normalize_text(r.departamento) == nombre_norm
-            ]
-            if matched_exact_rows:
-                rows = matched_exact_rows
-            else:
-                rows = [
-                    r for r in db.query(PuestoORM).all() if _normalize_text(r.departamento) == nombre_norm
-                ]
-                if not rows and codigo in SPECIAL_DEPARTAMENTO_CODES_ALLOW_EXACT_FALLBACK:
-                    rows = exact_rows
-                    used_special_exact_fallback = bool(rows)
-        else:
-            rows = exact_rows
-
-        if (not nombre or used_special_exact_fallback) and rows:
-            fallback_nombre = str(rows[0].departamento or "").strip()
-            nombre = fallback_nombre or None
+        dept_code = codigo.zfill(2)
+        rows = db.query(PuestoORM).filter(PuestoORM.departamento_codigo == dept_code).all()
+        nombre = departamento_names.get(dept_code)
+        if not nombre and rows:
+            nombre = str(rows[0].departamento or "").strip() or None
 
         return {
             "tipo": "departamento",
-            "codigo": codigo,
+            "codigo": dept_code,
             "nombre": nombre,
             **aggregate_rows(rows),
         }
 
-    nombre = municipio_name_by_code(codigo)
-    dept_nombre = departamento_name_by_code().get(codigo[:2])
-    dept_norm = _normalize_text(dept_nombre) if dept_nombre else None
-
-    def _mun_matches(row: PuestoORM) -> bool:
-        if not _municipio_names_match(nombre, row.municipio):
-            return False
-        if dept_norm and _normalize_text(row.departamento) != dept_norm:
-            return False
-        return True
-
-    exact_rows = db.query(PuestoORM).filter(PuestoORM.municipio_codigo == codigo).all()
-    if nombre:
-        matched_exact_rows = [r for r in exact_rows if _mun_matches(r)]
-        if matched_exact_rows:
-            rows = matched_exact_rows
-        else:
-            rows = [r for r in db.query(PuestoORM).all() if _mun_matches(r)]
-    else:
-        rows = exact_rows
-
+    mun_code = codigo.zfill(5)
+    nombre = municipio_names.get(mun_code)
+    rows = db.query(PuestoORM).filter(PuestoORM.municipio_codigo == mun_code).all()
     if not nombre and rows:
-        fallback_nombre = str(rows[0].municipio or "").strip()
-        nombre = fallback_nombre or None
+        nombre = str(rows[0].municipio or "").strip() or None
 
     return {
         "tipo": "municipio",
-        "codigo": codigo,
+        "codigo": mun_code,
         "nombre": nombre,
         **aggregate_rows(rows),
     }
@@ -298,10 +216,12 @@ def compute_territorio_analytics(
 
 def refresh_territorio_stats_cache(
     db: Session,
-    departamento_name_by_code: Callable[[], dict[str, str]],
-    municipio_name_by_code: Callable[[str], str | None],
 ) -> dict[str, int]:
     counts = {"pais": 0, "zona": 0, "departamento": 0, "municipio": 0}
+    departamento_names = _departamento_name_by_code(db)
+    municipio_names = _municipio_name_by_code(db)
+    zona_names = _zona_name_by_code(db)
+    dept_by_zone = _departments_by_zone(db)
 
     summary_rows = [
         {
@@ -336,41 +256,43 @@ def refresh_territorio_stats_cache(
     ]
 
     summaries_by_departamento_codigo: dict[str, list[dict[str, object]]] = {}
-    summaries_by_departamento_norm: dict[str, list[dict[str, object]]] = {}
     summaries_by_municipio_codigo: dict[str, list[dict[str, object]]] = {}
+    summaries_by_zona_codigo: dict[str, list[dict[str, object]]] = {}
     for row in summary_rows:
         summaries_by_departamento_codigo.setdefault(row["departamento_codigo"], []).append(row)
-        summaries_by_departamento_norm.setdefault(_normalize_text(row["departamento"]), []).append(row)
         summaries_by_municipio_codigo.setdefault(row["municipio_codigo"], []).append(row)
+        zone_code = None
+        for z_code, dept_codes in dept_by_zone.items():
+            if row["departamento_codigo"] in dept_codes:
+                zone_code = z_code
+                break
+        if zone_code:
+            summaries_by_zona_codigo.setdefault(zone_code, []).append(row)
 
     targets: list[tuple[str, str]] = [("pais", "CO")]
 
-    _, departamentos = build_departamentos_catalog()
-    zone_ids = sorted({int(dept.zone_id or 0) for dept in departamentos})
-    targets.extend([("zona", str(zone_id)) for zone_id in zone_ids])
+    zone_codes = sorted(set(zona_names.keys()) | set(summaries_by_zona_codigo.keys()))
+    targets.extend([("zona", code) for code in zone_codes])
 
     dept_codes = sorted(
         {
             code
-            for code in (set(departamento_name_by_code().keys()) | set(summaries_by_departamento_codigo.keys()))
+            for code in (set(departamento_names.keys()) | set(summaries_by_departamento_codigo.keys()))
             if re.fullmatch(r"\d{2}", str(code))
         }
     )
     targets.extend([("departamento", code) for code in dept_codes])
 
-    municipio_codes = sorted({
-        code
-        for code in (
-            {
-                str(municipio.code).strip().zfill(5)
-                for municipio in build_municipios_catalog()
-                if municipio.code
-            }
-            | set(summaries_by_municipio_codigo.keys())
-        )
-        if re.fullmatch(r"\d{5}", str(code))
-    })
+    municipio_codes = sorted(
+        {
+            code
+            for code in (set(municipio_names.keys()) | set(summaries_by_municipio_codigo.keys()))
+            if re.fullmatch(r"\d{5}", str(code))
+        }
+    )
     targets.extend([("municipio", code) for code in municipio_codes])
+
+    db.query(TerritorioStatsCacheORM).delete()
 
     for tipo, codigo in targets:
         if tipo == "pais":
@@ -381,63 +303,27 @@ def refresh_territorio_stats_cache(
                 **_aggregate_summary_rows(summary_rows),
             }
         elif tipo == "zona":
-            zone_id = int(codigo)
-            zone_departamentos = [d for d in departamentos if (d.zone_id or 0) == zone_id]
-            if not zone_departamentos:
+            zone_rows = summaries_by_zona_codigo.get(codigo, [])
+            zone_name = zona_names.get(codigo)
+            if not zone_rows:
                 payload = {
                     "tipo": "zona",
                     "codigo": codigo,
-                    "nombre": f"Zona {zone_id}",
+                    "nombre": zone_name or f"Zona {int(codigo)}",
                     **_aggregate_summary_rows([]),
                 }
             else:
-                zone_name = next(
-                    (
-                        (dept.zone_name or "").strip()
-                        for dept in zone_departamentos
-                        if (dept.zone_name or "").strip()
-                    ),
-                    f"Zona {zone_id}",
-                )
-                departamento_names_norm = {_normalize_text(dept.name) for dept in zone_departamentos}
-                zone_rows = [
-                    row for row in summary_rows
-                    if _normalize_text(row["departamento"]) in departamento_names_norm
-                ]
                 payload = {
                     "tipo": "zona",
                     "codigo": codigo,
-                    "nombre": zone_name,
+                    "nombre": zone_name or f"Zona {int(codigo)}",
                     **_aggregate_summary_rows(zone_rows),
                 }
         elif tipo == "departamento":
-            nombre = departamento_name_by_code().get(codigo)
-            nombre_norm = _normalize_text(nombre) if nombre else None
-            exact_dept_rows = summaries_by_departamento_codigo.get(codigo, [])
-            used_special_exact_fallback = False
-
-            if nombre_norm:
-                matched = [
-                    r for r in exact_dept_rows if _normalize_text(r["departamento"]) == nombre_norm
-                ]
-                if matched:
-                    dept_rows = matched
-                else:
-                    dept_rows = summaries_by_departamento_norm.get(nombre_norm, [])
-                    if (
-                        not dept_rows
-                        and codigo in SPECIAL_DEPARTAMENTO_CODES_ALLOW_EXACT_FALLBACK
-                    ):
-                        dept_rows = exact_dept_rows
-                        used_special_exact_fallback = bool(dept_rows)
-            else:
-                dept_rows = exact_dept_rows
-
-            if (not nombre or used_special_exact_fallback) and dept_rows:
-                fallback_nombre = next(
-                    (str(row.get("departamento") or "").strip() for row in dept_rows if str(row.get("departamento") or "").strip()),
-                    "",
-                )
+            nombre = departamento_names.get(codigo)
+            dept_rows = summaries_by_departamento_codigo.get(codigo, [])
+            if not nombre and dept_rows:
+                fallback_nombre = str(dept_rows[0].get("departamento") or "").strip()
                 nombre = fallback_nombre or None
 
             payload = {
@@ -447,45 +333,10 @@ def refresh_territorio_stats_cache(
                 **_aggregate_summary_rows(dept_rows),
             }
         else:
-            nombre = municipio_name_by_code(codigo)
-            dept_nombre = departamento_name_by_code().get(codigo[:2])
-            dept_norm = _normalize_text(dept_nombre) if dept_nombre else None
-
-            def _summary_matches(row: dict[str, object]) -> bool:
-                if not _municipio_names_match(nombre, str(row["municipio"])):
-                    return False
-                if dept_norm and _normalize_text(str(row["departamento"])) != dept_norm:
-                    return False
-                return True
-
-            exact_mun_rows = summaries_by_municipio_codigo.get(codigo, [])
-            if nombre:
-                matched = [row for row in exact_mun_rows if _summary_matches(row)]
-                if matched:
-                    mun_rows = matched
-                elif dept_norm:
-                    mun_rows = [
-                        row
-                        for row in summaries_by_departamento_norm.get(dept_norm, [])
-                        if _summary_matches(row)
-                    ]
-                else:
-                    mun_rows = []
-            else:
-                mun_rows = exact_mun_rows
-
-            if not mun_rows and nombre and dept_norm:
-                mun_rows = [
-                    row
-                    for row in summaries_by_departamento_norm.get(dept_norm, [])
-                    if _summary_matches(row)
-                ]
-
+            nombre = municipio_names.get(codigo)
+            mun_rows = summaries_by_municipio_codigo.get(codigo, [])
             if not nombre and mun_rows:
-                fallback_nombre = next(
-                    (str(row.get("municipio") or "").strip() for row in mun_rows if str(row.get("municipio") or "").strip()),
-                    "",
-                )
+                fallback_nombre = str(mun_rows[0].get("municipio") or "").strip()
                 nombre = fallback_nombre or None
 
             payload = {
