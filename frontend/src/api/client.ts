@@ -49,6 +49,34 @@ export interface TerritorioStats {
   hombres_sum: number;
 }
 
+export interface ResultadosCandidato {
+  codigo: string;
+  nombre: string;
+  votos: number;
+}
+
+export interface ResultadosPartido {
+  partido_codigo: string;
+  partido_nombre: string;
+  partido_votos: number;
+  pct_partido: number;
+  top5_candidatos: ResultadosCandidato[];
+}
+
+export interface ResultadosElectorales {
+  anio: number;
+  nivel: string;
+  nivel_codigo: string;
+  nivel_nombre: string;
+  corporacion_codigo: string;
+  corporacion_nombre: string;
+  votos_total: number;
+  votos_validos: number;
+  votos_nulos: number;
+  votos_blancos: number;
+  partidos: ResultadosPartido[];
+}
+
 export const api = {
   // Get jurisdictions by layer
   async getJurisdicciones(layer: ElectoralLayer, parentCode?: string): Promise<Jurisdiccion[]> {
@@ -118,6 +146,19 @@ export const api = {
   async getMunicipiosGeoJSON(departamentoCodigo: string): Promise<any> {
     const response = await apiClient.get('/api/v1/geojson/municipios', {
       params: { departamento_codigo: departamentoCodigo },
+    });
+    return response.data;
+  },
+
+  // Get electoral results for a territory level
+  async getResultadosElectorales(
+    nivel: 'pais' | 'departamento' | 'municipio' | 'puesto',
+    nivel_codigo: string,
+    corporacion: '001' | '002',
+    anio: number,
+  ): Promise<ResultadosElectorales> {
+    const response = await apiClient.get('/api/v1/resultados/electorales', {
+      params: { nivel, nivel_codigo, corporacion, anio },
     });
     return response.data;
   },

@@ -161,6 +161,101 @@ class PersonaORM(Base):
     jurisdiccion = relationship("JurisdiccionORM")
 
 
+class ResultadosPaisORM(Base):
+    __tablename__ = "resultados_pais"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    anio: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    corporacion_codigo: Mapped[str] = mapped_column(String(4), nullable=False, index=True)
+    corporacion_nombre: Mapped[str] = mapped_column(String(64), nullable=False)
+    votos_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    votos_validos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    votos_nulos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    votos_blancos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    partido_codigo: Mapped[str] = mapped_column(String(8), nullable=False)
+    partido_nombre: Mapped[str] = mapped_column(String(128), nullable=False)
+    partido_votos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    top5_candidatos: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+
+    __table_args__ = (
+        UniqueConstraint("anio", "corporacion_codigo", "partido_codigo", name="uq_resultados_pais"),
+    )
+
+
+class ResultadosDepartamentoORM(Base):
+    __tablename__ = "resultados_departamento"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    anio: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    dep_codigo: Mapped[str] = mapped_column(String(2), nullable=False, index=True)
+    dep_nombre: Mapped[str] = mapped_column(String(128), nullable=False)
+    corporacion_codigo: Mapped[str] = mapped_column(String(4), nullable=False, index=True)
+    corporacion_nombre: Mapped[str] = mapped_column(String(64), nullable=False)
+    votos_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    votos_validos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    votos_nulos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    votos_blancos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    partido_codigo: Mapped[str] = mapped_column(String(8), nullable=False)
+    partido_nombre: Mapped[str] = mapped_column(String(128), nullable=False)
+    partido_votos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    top5_candidatos: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+
+    __table_args__ = (
+        UniqueConstraint("anio", "dep_codigo", "corporacion_codigo", "partido_codigo", name="uq_resultados_departamento"),
+        Index("ix_resultados_dep_anio_corp", "anio", "dep_codigo", "corporacion_codigo"),
+    )
+
+
+class ResultadosMunicipioORM(Base):
+    __tablename__ = "resultados_municipio"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    anio: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    mun_codigo: Mapped[str] = mapped_column(String(5), nullable=False, index=True)
+    mun_nombre: Mapped[str] = mapped_column(String(160), nullable=False)
+    dep_codigo: Mapped[str] = mapped_column(String(2), nullable=False, index=True)
+    corporacion_codigo: Mapped[str] = mapped_column(String(4), nullable=False, index=True)
+    corporacion_nombre: Mapped[str] = mapped_column(String(64), nullable=False)
+    votos_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    votos_validos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    votos_nulos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    votos_blancos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    partido_codigo: Mapped[str] = mapped_column(String(8), nullable=False)
+    partido_nombre: Mapped[str] = mapped_column(String(128), nullable=False)
+    partido_votos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    top5_candidatos: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+
+    __table_args__ = (
+        UniqueConstraint("anio", "mun_codigo", "corporacion_codigo", "partido_codigo", name="uq_resultados_municipio"),
+        Index("ix_resultados_mun_anio_corp", "anio", "mun_codigo", "corporacion_codigo"),
+    )
+
+
+class ResultadosPuestoORM(Base):
+    __tablename__ = "resultados_puesto"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    anio: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    codigo_puesto: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    mun_codigo: Mapped[str] = mapped_column(String(5), nullable=False, index=True)
+    dep_codigo: Mapped[str] = mapped_column(String(2), nullable=False, index=True)
+    corporacion_codigo: Mapped[str] = mapped_column(String(4), nullable=False, index=True)
+    corporacion_nombre: Mapped[str] = mapped_column(String(64), nullable=False)
+    votos_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    votos_validos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    votos_nulos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    votos_blancos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    partido_codigo: Mapped[str] = mapped_column(String(8), nullable=False)
+    partido_nombre: Mapped[str] = mapped_column(String(128), nullable=False)
+    partido_votos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    top5_candidatos: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+
+    __table_args__ = (
+        UniqueConstraint("anio", "codigo_puesto", "corporacion_codigo", "partido_codigo", name="uq_resultados_puesto"),
+        Index("ix_resultados_puesto_anio_corp", "anio", "codigo_puesto", "corporacion_codigo"),
+    )
+
+
 class TerritorioStatsCacheORM(Base):
     __tablename__ = "territorio_stats_cache"
 

@@ -7,20 +7,36 @@ type LandingView = "puestos" | "jurados" | "resultados";
 
 interface LandingEntryScreenProps {
   onEnterPuestos: () => void;
+  onEnterResultados: (year: number) => void;
 }
 
 const RESULT_YEARS = [2020, 2021, 2022, 2023, 2024, 2025, 2026] as const;
+const AVAILABLE_YEARS = new Set([2022]);
 
 export function LandingEntryScreen({
   onEnterPuestos,
+  onEnterResultados,
 }: LandingEntryScreenProps) {
   const [selectedView, setSelectedView] = useState<LandingView>("puestos");
-  const [selectedYear, setSelectedYear] = useState<number>(2026);
+  const [selectedYear, setSelectedYear] = useState<number>(2022);
+
+  const canEnter =
+    selectedView === "puestos" ||
+    (selectedView === "resultados" && AVAILABLE_YEARS.has(selectedYear));
 
   const handleContinue = () => {
     if (selectedView === "puestos") {
       onEnterPuestos();
+    } else if (selectedView === "resultados" && AVAILABLE_YEARS.has(selectedYear)) {
+      onEnterResultados(selectedYear);
     }
+  };
+
+  const enterButtonLabel = () => {
+    if (selectedView === "jurados") return "Disponible próximamente";
+    if (selectedView === "resultados" && !AVAILABLE_YEARS.has(selectedYear))
+      return "Solo disponible 2022";
+    return "Entrar";
   };
 
   return (
@@ -115,7 +131,7 @@ export function LandingEntryScreen({
                   htmlFor="year-selector"
                   className="text-lg font-semibold text-slate-700"
                 >
-                  Año de resultados (2020 - 2026)
+                  Año de resultados
                 </label>
                 <select
                   id="year-selector"
@@ -126,8 +142,8 @@ export function LandingEntryScreen({
                   className="w-full max-w-sm rounded-lg border border-slate-300 bg-white px-4 py-3 text-center text-lg text-slate-900 [text-align-last:center]"
                 >
                   {RESULT_YEARS.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
+                    <option key={year} value={year} disabled={!AVAILABLE_YEARS.has(year)}>
+                      {year}{!AVAILABLE_YEARS.has(year) ? " (próximamente)" : ""}
                     </option>
                   ))}
                 </select>
@@ -140,13 +156,14 @@ export function LandingEntryScreen({
           <button
             type="button"
             onClick={handleContinue}
+            disabled={!canEnter}
             className={`rounded-xl px-14 py-6 text-2xl font-semibold transition ${
-              selectedView === "puestos"
+              canEnter
                 ? "bg-blue-700 text-white hover:bg-blue-800"
                 : "cursor-not-allowed bg-slate-300 text-slate-600"
             }`}
           >
-            {selectedView === "puestos" ? "Entrar" : "Disponible próximamente"}
+            {enterButtonLabel()}
           </button>
         </div>
       </main>

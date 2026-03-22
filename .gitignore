@@ -11,6 +11,11 @@ __pycache__/
 *.pyd
 tl.txt
 .Python
+.claude/
+.github/
+.github
+.claude
+
 
 # Jupyter Notebook
 .ipynb_checkpoints

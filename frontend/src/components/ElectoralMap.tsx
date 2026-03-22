@@ -248,7 +248,12 @@ function MapController({
   return null;
 }
 
-export function ElectoralMap() {
+interface ElectoralMapProps {
+  activeView?: import('../App').ActiveView;
+  selectedYear?: number;
+}
+
+export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: ElectoralMapProps) {
   const {
     currentJurisdiccion,
     navigateTo,
@@ -1468,6 +1473,8 @@ export function ElectoralMap() {
         <div className="min-h-0 lg:pr-4 xl:pr-6">
           <MapInfoRail
             currentJurisdiccion={currentJurisdiccion}
+            activeView={activeView}
+            selectedYear={selectedYear}
             selectedPuesto={selectedPuesto}
             selectedPuestoTerritory={selectedPuestoTerritory}
             territorioStats={territorioStats}

@@ -1,13 +1,13 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Vista inicial por zonas
 
-El sistema SHALL mostrar una vista nacional por zonas electorales antes de la vista por departamentos cuando el usuario ingrese al mapa.
+El sistema SHALL mostrar una vista nacional por zonas electorales como primera vista del mapa después de que el usuario complete la selección de entrada en la pantalla inicial. El mapa iniciará con capa base de departamentos y estilos de zona aplicados, permitiendo visualización de límites de zonas electorales sin navegación previa al pais.
 
 #### Scenario: Carga inicial del mapa en modo zona
 
-- **WHEN** el usuario abre la aplicación en la pantalla principal del mapa
-- **THEN** el sistema MUST presentar el nivel de zonas como vista inicial
+- **WHEN** el usuario selecciona "Información Puestos" y accede al mapa funcional
+- **THEN** el sistema MUST presentar la vista de departamentos con estilos de zona electorales aplicados, proporcionando contexto visual completo de divisiones territoriales de zonas sin requerir navegación intermedia
 
 ### Requirement: Selección de zona y filtrado de departamentos
 

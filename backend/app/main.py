@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from collections import defaultdict
 from difflib import SequenceMatcher
 from typing import Any, List, Optional
 
@@ -15,12 +16,19 @@ from sqlalchemy.orm import Session
 # try:
 from app.config import settings
 from app.database import Base, get_db  # noqa: F401 – re-exported for tests
+import json as _json
+from typing import Literal
+
 from app.db_models import (
     CatalogoNivelTerritorial,
     CatalogoTipoJurisdiccion,
     JurisdiccionORM,
     PersonaORM,
     PuestoORM,
+    ResultadosDepartamentoORM,
+    ResultadosMunicipioORM,
+    ResultadosPaisORM,
+    ResultadosPuestoORM,
     TerritorioDepartamentoORM,
     TerritorioMunicipioORM,
     TerritorioZonaORM,
@@ -933,6 +941,263 @@ def get_municipios_geojson(
         })
 
     return {"type": "FeatureCollection", "features": features}
+
+
+# ---------------------------------------------------------------------------
+# Resultados Electorales — schemas
+# ---------------------------------------------------------------------------
+
+
+class ResultadosCandidatoSchema(BaseModel):
+    codigo: str
+    nombre: str
+    votos: int
+
+
+class ResultadosPartidoSchema(BaseModel):
+    partido_codigo: str
+    partido_nombre: str
+    partido_votos: int
+    pct_partido: float
+    top5_candidatos: List[ResultadosCandidatoSchema]
+
+
+class ResultadosElectoralesResponse(BaseModel):
+    anio: int
+    nivel: str
+    nivel_codigo: str
+    nivel_nombre: str
+    corporacion_codigo: str
+    corporacion_nombre: str
+    votos_total: int
+    votos_validos: int
+    votos_nulos: int
+    votos_blancos: int
+    partidos: List[ResultadosPartidoSchema]
+
+
+# ---------------------------------------------------------------------------
+# Resultados Electorales — endpoint
+# ---------------------------------------------------------------------------
+
+_NIVEL_MODELO = {
+    "pais": ResultadosPaisORM,
+    "departamento": ResultadosDepartamentoORM,
+    "municipio": ResultadosMunicipioORM,
+    "puesto": ResultadosPuestoORM,
+}
+
+_NIVEL_CODIGO_FIELD = {
+    "pais": None,
+    "departamento": "dep_codigo",
+    "municipio": "mun_codigo",
+    "puesto": "codigo_puesto",
+}
+
+_NIVEL_NOMBRE_FIELD = {
+    "pais": None,
+    "departamento": "dep_nombre",
+    "municipio": "mun_nombre",
+    "puesto": None,
+}
+
+
+def _build_resultados_response(
+    rows: list,
+    anio: int,
+    nivel: str,
+    nivel_codigo: str,
+    nivel_nombre: str,
+    corporacion: str,
+) -> ResultadosElectoralesResponse:
+    """Build response from a list of resultados ORM rows (same-nivel, same-corp)."""
+    first = rows[0]
+    votos_validos = first.votos_validos
+
+    partidos: List[ResultadosPartidoSchema] = []
+    for row in rows:
+        try:
+            candidatos_raw = _json.loads(row.top5_candidatos or "[]")
+        except Exception:
+            candidatos_raw = []
+        pct = round(row.partido_votos / votos_validos * 100, 1) if votos_validos > 0 else 0.0
+        partidos.append(ResultadosPartidoSchema(
+            partido_codigo=row.partido_codigo,
+            partido_nombre=row.partido_nombre,
+            partido_votos=row.partido_votos,
+            pct_partido=pct,
+            top5_candidatos=[ResultadosCandidatoSchema(**c) for c in candidatos_raw],
+        ))
+
+    return ResultadosElectoralesResponse(
+        anio=anio,
+        nivel=nivel,
+        nivel_codigo=nivel_codigo,
+        nivel_nombre=nivel_nombre,
+        corporacion_codigo=corporacion,
+        corporacion_nombre=first.corporacion_nombre,
+        votos_total=first.votos_total,
+        votos_validos=first.votos_validos,
+        votos_nulos=first.votos_nulos,
+        votos_blancos=first.votos_blancos,
+        partidos=partidos,
+    )
+
+
+def _aggregate_zona(
+    dep_rows_by_dep: dict[str, list],
+    anio: int,
+    zona_codigo: str,
+    zona_nombre: str,
+    corporacion: str,
+) -> ResultadosElectoralesResponse:
+    """
+    Aggregate resultados_departamento rows for multiple departments into one zone response.
+    dep_rows_by_dep: {dep_codigo -> [ORM rows for that dep]}
+    """
+    # Aggregate totals: sum unique-dep totals (totals are same for all rows of a dep)
+    votos_total = 0
+    votos_validos = 0
+    votos_nulos = 0
+    votos_blancos = 0
+    corp_nombre = ""
+
+    for dep_rows in dep_rows_by_dep.values():
+        if dep_rows:
+            r = dep_rows[0]
+            votos_total += r.votos_total
+            votos_validos += r.votos_validos
+            votos_nulos += r.votos_nulos
+            votos_blancos += r.votos_blancos
+            corp_nombre = r.corporacion_nombre
+
+    # Aggregate partido votos and merge candidates
+    partido_votos: dict[str, int] = defaultdict(int)
+    partido_nombre_map: dict[str, str] = {}
+    candidatos_by_partido: dict[str, dict[str, dict]] = defaultdict(dict)
+
+    for dep_rows in dep_rows_by_dep.values():
+        for row in dep_rows:
+            par = row.partido_codigo
+            partido_votos[par] += row.partido_votos
+            partido_nombre_map[par] = row.partido_nombre
+            try:
+                top5 = _json.loads(row.top5_candidatos or "[]")
+            except Exception:
+                top5 = []
+            for cand in top5:
+                cod = cand.get("codigo", "")
+                if cod not in candidatos_by_partido[par]:
+                    candidatos_by_partido[par][cod] = {"codigo": cod, "nombre": cand.get("nombre", ""), "votos": 0}
+                candidatos_by_partido[par][cod]["votos"] += cand.get("votos", 0)
+
+    # Build sorted partido list
+    partidos: List[ResultadosPartidoSchema] = []
+    for par_codigo, par_votos in sorted(partido_votos.items(), key=lambda x: -x[1]):
+        top5_merged = sorted(candidatos_by_partido[par_codigo].values(), key=lambda c: -c["votos"])[:5]
+        pct = round(par_votos / votos_validos * 100, 1) if votos_validos > 0 else 0.0
+        partidos.append(ResultadosPartidoSchema(
+            partido_codigo=par_codigo,
+            partido_nombre=partido_nombre_map[par_codigo],
+            partido_votos=par_votos,
+            pct_partido=pct,
+            top5_candidatos=[ResultadosCandidatoSchema(**c) for c in top5_merged],
+        ))
+
+    return ResultadosElectoralesResponse(
+        anio=anio,
+        nivel="zona",
+        nivel_codigo=zona_codigo,
+        nivel_nombre=zona_nombre,
+        corporacion_codigo=corporacion,
+        corporacion_nombre=corp_nombre,
+        votos_total=votos_total,
+        votos_validos=votos_validos,
+        votos_nulos=votos_nulos,
+        votos_blancos=votos_blancos,
+        partidos=partidos,
+    )
+
+
+@app.get("/api/v1/resultados/electorales", response_model=ResultadosElectoralesResponse)
+def get_resultados_electorales(
+    anio: int = Query(..., description="Año electoral (ej. 2022)"),
+    nivel: str = Query(..., description="Nivel territorial: pais | zona | departamento | municipio | puesto"),
+    nivel_codigo: str = Query(..., description="Código del nivel (CO para país, zona_codigo 01-06 para zona, código DANE para otros)"),
+    corporacion: str = Query(..., description="Código de corporación: 001=SENADO, 002=CAMARA"),
+    db: Session = Depends(get_db),
+):
+    """
+    Retorna resultados electorales para un nivel territorial, año y corporación.
+    Niveles: pais | zona | departamento | municipio | puesto.
+    Para zona, nivel_codigo es el zona_codigo (01-06); agrega sobre departamentos de esa zona.
+    """
+    valid_niveles = list(_NIVEL_MODELO.keys()) + ["zona"]
+    if nivel not in valid_niveles:
+        raise HTTPException(status_code=422, detail=f"nivel debe ser uno de: {valid_niveles}")
+
+    # ── Zona: aggregate on-the-fly from resultados_departamento ──────────────
+    if nivel == "zona":
+        zona_codigo = nivel_codigo.zfill(2)
+        zona = db.query(TerritorioZonaORM).filter(TerritorioZonaORM.codigo == zona_codigo).first()
+        zona_nombre = zona.nombre if zona else f"Zona {zona_codigo}"
+
+        dep_codigos = [
+            r.codigo for r in
+            db.query(TerritorioDepartamentoORM).filter(
+                TerritorioDepartamentoORM.zona_codigo == zona_codigo
+            ).all()
+        ]
+        if not dep_codigos:
+            raise HTTPException(status_code=404, detail=f"No se encontraron departamentos para zona {zona_codigo}")
+
+        all_dep_rows = (
+            db.query(ResultadosDepartamentoORM)
+            .filter(
+                ResultadosDepartamentoORM.anio == anio,
+                ResultadosDepartamentoORM.corporacion_codigo == corporacion,
+                ResultadosDepartamentoORM.dep_codigo.in_(dep_codigos),
+            )
+            .all()
+        )
+        if not all_dep_rows:
+            raise HTTPException(status_code=404, detail=f"No hay resultados para zona={zona_codigo}, anio={anio}, corporacion={corporacion}")
+
+        dep_rows_by_dep: dict[str, list] = defaultdict(list)
+        for row in all_dep_rows:
+            dep_rows_by_dep[row.dep_codigo].append(row)
+
+        return _aggregate_zona(dep_rows_by_dep, anio, zona_codigo, zona_nombre, corporacion)
+
+    # ── Standard niveles ─────────────────────────────────────────────────────
+    modelo = _NIVEL_MODELO[nivel]
+    codigo_field = _NIVEL_CODIGO_FIELD[nivel]
+
+    query = db.query(modelo).filter(
+        modelo.anio == anio,
+        modelo.corporacion_codigo == corporacion,
+    )
+    if codigo_field:
+        query = query.filter(getattr(modelo, codigo_field) == nivel_codigo)
+
+    rows = query.order_by(modelo.partido_votos.desc()).all()
+
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No hay resultados para nivel={nivel}, nivel_codigo={nivel_codigo}, anio={anio}, corporacion={corporacion}",
+        )
+
+    first = rows[0]
+    nombre_field = _NIVEL_NOMBRE_FIELD.get(nivel)
+    if nombre_field:
+        nivel_nombre = getattr(first, nombre_field, nivel_codigo)
+    elif nivel == "pais":
+        nivel_nombre = "Colombia"
+    else:
+        nivel_nombre = nivel_codigo
+
+    return _build_resultados_response(rows, anio, nivel, nivel_codigo, nivel_nombre, corporacion)
 
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,9 @@
 import type { PuestoElectoral, TerritorioStats } from "../api/client";
 import type { Jurisdiccion } from "../stores/navigationStore";
+import type { ActiveView } from "../App";
 import { PuestoDetailPanel } from "./PuestoDetailPanel";
 import { TeritorioStatsPanel } from "./TeritorioStatsPanel";
+import { ResultadosElectoralesPanel } from "./ResultadosElectoralesPanel";
 
 interface PuestoTerritoryContext {
   municipio: string | null;
@@ -11,6 +13,8 @@ interface PuestoTerritoryContext {
 
 interface MapInfoRailProps {
   currentJurisdiccion: Jurisdiccion | null;
+  activeView: ActiveView;
+  selectedYear: number;
   selectedPuesto: PuestoElectoral | null;
   selectedPuestoTerritory: PuestoTerritoryContext | null;
   territorioStats: TerritorioStats | null;
@@ -45,6 +49,8 @@ function layerLabel(layer?: Jurisdiccion["layer"] | null): string {
 
 export function MapInfoRail({
   currentJurisdiccion,
+  activeView,
+  selectedYear,
   selectedPuesto,
   selectedPuestoTerritory,
   territorioStats,
@@ -60,6 +66,18 @@ export function MapInfoRail({
   const currentContextLabel = currentJurisdiccion
     ? `${layerLabel(currentJurisdiccion.layer)} activo`
     : "Contexto territorial";
+
+  if (activeView === 'resultados') {
+    return (
+      <div className="contents lg:block lg:h-full lg:min-h-0">
+        <ResultadosElectoralesPanel
+          currentJurisdiccion={currentJurisdiccion}
+          selectedPuesto={selectedPuesto}
+          selectedYear={selectedYear}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="contents lg:block lg:h-full lg:min-h-0">
