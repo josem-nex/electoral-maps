@@ -1,11 +1,23 @@
+import { useState } from "react";
 import { ElectoralMap } from "./components/ElectoralMap";
 import { Breadcrumbs } from "./components/Breadcrumbs";
 import { SearchBar } from "./components/SearchBar";
+import { LandingEntryScreen } from "./components/LandingEntryScreen";
 import { useNavigationStore } from "./stores/navigationStore";
 
 function App() {
-  const { currentJurisdiccion, navigateBack, navigationStack } =
+  const [isEntryComplete, setIsEntryComplete] = useState(false);
+  const { currentJurisdiccion, navigateBack, navigationStack, reset } =
     useNavigationStore();
+
+  const handleEnterPuestos = () => {
+    reset();
+    setIsEntryComplete(true);
+  };
+
+  if (!isEntryComplete) {
+    return <LandingEntryScreen onEnterPuestos={handleEnterPuestos} />;
+  }
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden">
