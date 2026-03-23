@@ -220,7 +220,26 @@ def top5(candidatos: dict) -> list:
 
 # ── main ingesta ──────────────────────────────────────────────────────────────
 
-def run_ingesta(anio: int, csv_path: Path, engine) -> None:
+# ── column mapping for formato 2026 ──────────────────────────────────────────
+COLS_2026 = {
+    "Departamento_ID": "DEP",
+    "Municipio_ID": "MUN",
+    "Zona_ID": "ZONA",
+    "Puesto_ID": "PUESTO",
+    "Puesto_Nom": "PUESNOMBRE",
+    "Mesa_ID": "MESA",
+    "Partido_ID": "PAR",
+    "Partido_Nom": "PARNOMBRE",
+    "Candidato_ID": "CAN",
+    "Candidato_Nom": "CANNOMBRE",
+    "Votos": "VOTOS",
+}
+
+
+def run_ingesta(anio: int, csv_path: Path, engine, *,
+                formato: str = "2022",
+                corp_codigo: str | None = None,
+                corp_nombre: str | None = None) -> None:
     log.info("Cargando lookup de puestos desde BD…")
     by_code, by_name, by_mun = load_puesto_lookup(engine)
     dep_names, mun_names = load_territorial_names(engine)
@@ -241,18 +260,27 @@ def run_ingesta(anio: int, csv_path: Path, engine) -> None:
     total_rows = 0
     skipped = 0
 
-    log.info("Procesando CSV en chunks de %d filas…", CHUNK_SIZE)
+    log.info("Procesando CSV en chunks de %d filas… (formato=%s)", CHUNK_SIZE, formato)
+
+    if formato == "2026":
+        sep, encoding = ",", "utf-8"
+    else:
+        sep, encoding = ";", "latin-1"
 
     csv_iter = pd.read_csv(
         csv_path,
-        sep=";",
+        sep=sep,
         chunksize=CHUNK_SIZE,
         dtype=str,
         keep_default_na=False,
-        encoding="latin-1",
+        encoding=encoding,
     )
 
     for chunk_idx, chunk in enumerate(csv_iter):
+        # Normalize column names for formato 2026
+        if formato == "2026":
+            chunk = chunk.rename(columns=COLS_2026)
+
         for col in ["DEP", "MUN", "ZONA", "PUESTO", "PUESNOMBRE", "CORCODIGO", "CONOMBRE",
                     "PAR", "PARNOMBRE", "CAN", "CANNOMBRE", "VOTOS"]:
             if col in chunk.columns:
@@ -267,8 +295,13 @@ def run_ingesta(anio: int, csv_path: Path, engine) -> None:
             mun = row.MUN
             zona = row.ZONA
             puesto_raw = row.PUESTO
-            corp_codigo = row.CORCODIGO
-            corp_nombre = row.CONOMBRE
+            # En formato 2026 la corporación viene de los args, no del CSV
+            if formato == "2026":
+                _corp_codigo = corp_codigo
+                _corp_nombre = corp_nombre
+            else:
+                _corp_codigo = row.CORCODIGO
+                _corp_nombre = row.CONOMBRE
             par_codigo = row.PAR
             par_nombre = row.PARNOMBRE
             can_codigo = row.CAN
@@ -288,8 +321,8 @@ def run_ingesta(anio: int, csv_path: Path, engine) -> None:
                 tipo = "blanco"
             else:
                 tipo = "candidato"
-                # Skip PAR=0000 for non-special rows (no-party rows shouldn't aggregate)
-                if par_codigo == "0000" or par_nombre == r"\N":
+                # Skip no-party rows (PAR=0000 en 2022, PAR=00000/NO ENCONTRADO en 2026)
+                if par_codigo in ("0000", "00000") or par_nombre in (r"\N", "NO ENCONTRADO"):
                     continue
 
             # Build codigo_puesto
@@ -311,15 +344,15 @@ def run_ingesta(anio: int, csv_path: Path, engine) -> None:
                     # Accumulate at mun/dep/pais if territorial codes are known
                     full_mun = dep + mun
                     if dep in dep_names and full_mun in mun_names:
-                        _add_totals(pais_totals, (corp_codigo,), tipo, votos)
-                        _add_totals(dep_totals, (dep, corp_codigo), tipo, votos)
-                        _add_totals(mun_totals, (full_mun, corp_codigo), tipo, votos)
+                        _add_totals(pais_totals, (_corp_codigo,), tipo, votos)
+                        _add_totals(dep_totals, (dep, _corp_codigo), tipo, votos)
+                        _add_totals(mun_totals, (full_mun, _corp_codigo), tipo, votos)
                         if tipo == "candidato":
-                            _add_partido(pais_partidos, (corp_codigo, par_codigo, par_nombre, corp_nombre),
+                            _add_partido(pais_partidos, (_corp_codigo, par_codigo, par_nombre, _corp_nombre),
                                          can_codigo, can_nombre, votos)
-                            _add_partido(dep_partidos, (dep, corp_codigo, par_codigo, par_nombre, corp_nombre),
+                            _add_partido(dep_partidos, (dep, _corp_codigo, par_codigo, par_nombre, _corp_nombre),
                                          can_codigo, can_nombre, votos)
-                            _add_partido(mun_partidos, (full_mun, dep, corp_codigo, par_codigo, par_nombre, corp_nombre),
+                            _add_partido(mun_partidos, (full_mun, dep, _corp_codigo, par_codigo, par_nombre, _corp_nombre),
                                          can_codigo, can_nombre, votos)
                     continue
 
@@ -328,20 +361,20 @@ def run_ingesta(anio: int, csv_path: Path, engine) -> None:
             mun_codigo = puesto_info["mun_codigo"]
 
             # ── Accumulate totals (nulos/blancos/validos) ──
-            _add_totals(pais_totals, (corp_codigo,), tipo, votos)
-            _add_totals(dep_totals, (dep_codigo, corp_codigo), tipo, votos)
-            _add_totals(mun_totals, (mun_codigo, corp_codigo), tipo, votos)
-            _add_totals(puesto_totals, (codigo_puesto, corp_codigo), tipo, votos)
+            _add_totals(pais_totals, (_corp_codigo,), tipo, votos)
+            _add_totals(dep_totals, (dep_codigo, _corp_codigo), tipo, votos)
+            _add_totals(mun_totals, (mun_codigo, _corp_codigo), tipo, votos)
+            _add_totals(puesto_totals, (codigo_puesto, _corp_codigo), tipo, votos)
 
             # ── Accumulate partido votos (only for candidato rows) ──
             if tipo == "candidato":
-                _add_partido(pais_partidos, (corp_codigo, par_codigo, par_nombre, corp_nombre),
+                _add_partido(pais_partidos, (_corp_codigo, par_codigo, par_nombre, _corp_nombre),
                              can_codigo, can_nombre, votos)
-                _add_partido(dep_partidos, (dep_codigo, corp_codigo, par_codigo, par_nombre, corp_nombre),
+                _add_partido(dep_partidos, (dep_codigo, _corp_codigo, par_codigo, par_nombre, _corp_nombre),
                              can_codigo, can_nombre, votos)
-                _add_partido(mun_partidos, (mun_codigo, dep_codigo, corp_codigo, par_codigo, par_nombre, corp_nombre),
+                _add_partido(mun_partidos, (mun_codigo, dep_codigo, _corp_codigo, par_codigo, par_nombre, _corp_nombre),
                              can_codigo, can_nombre, votos)
-                _add_partido(puesto_partidos, (codigo_puesto, mun_codigo, dep_codigo, corp_codigo, par_codigo, par_nombre, corp_nombre),
+                _add_partido(puesto_partidos, (codigo_puesto, mun_codigo, dep_codigo, _corp_codigo, par_codigo, par_nombre, _corp_nombre),
                              can_codigo, can_nombre, votos)
 
         if (chunk_idx + 1) % 5 == 0:
@@ -356,10 +389,21 @@ def run_ingesta(anio: int, csv_path: Path, engine) -> None:
         log.warning("%d filas no encontradas → %s", len(error_lines), error_path)
 
     # ── Truncate and reload ────────────────────────────────────────────────
-    log.info("Eliminando registros previos del año %d…", anio)
-    with engine.begin() as conn:
-        for table in ("resultados_pais", "resultados_departamento", "resultados_municipio", "resultados_puesto"):
-            conn.execute(text(f"DELETE FROM {table} WHERE anio = :anio"), {"anio": anio})
+    # Para formato 2026 (dos ejecuciones separadas) acotamos por corporacion_codigo
+    # para no borrar SENADO al ingestar CÁMARA (y viceversa).
+    if formato == "2026":
+        log.info("Eliminando registros previos del año %d, corporacion=%s…", anio, corp_codigo)
+        with engine.begin() as conn:
+            for table in ("resultados_pais", "resultados_departamento", "resultados_municipio", "resultados_puesto"):
+                conn.execute(
+                    text(f"DELETE FROM {table} WHERE anio = :anio AND corporacion_codigo = :corp"),
+                    {"anio": anio, "corp": corp_codigo},
+                )
+    else:
+        log.info("Eliminando registros previos del año %d…", anio)
+        with engine.begin() as conn:
+            for table in ("resultados_pais", "resultados_departamento", "resultados_municipio", "resultados_puesto"):
+                conn.execute(text(f"DELETE FROM {table} WHERE anio = :anio"), {"anio": anio})
 
     # ── Insert resultados_pais ─────────────────────────────────────────────
     log.info("Insertando resultados_pais…")
@@ -471,7 +515,22 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Importar resultados electorales desde CSV.")
     parser.add_argument("--anio", type=int, required=True, help="Año electoral (ej. 2022)")
     parser.add_argument("--csv", type=Path, required=True, help="Ruta al archivo CSV")
+    parser.add_argument(
+        "--formato", choices=["2022", "2026"], default="2022",
+        help="Formato del CSV: '2022' (sep=;, latin-1) o '2026' (sep=,, utf-8, columnas nuevas)",
+    )
+    parser.add_argument(
+        "--corp", default=None,
+        help="Código de corporación para formato 2026 (ej. '001'). Requerido con --formato 2026.",
+    )
+    parser.add_argument(
+        "--corp-nom", default=None, dest="corp_nom",
+        help="Nombre de corporación para formato 2026 (ej. 'SENADO'). Requerido con --formato 2026.",
+    )
     args = parser.parse_args()
+
+    if args.formato == "2026" and (not args.corp or not args.corp_nom):
+        parser.error("--corp y --corp-nom son requeridos cuando --formato es '2026'")
 
     csv_path = args.csv
     if not csv_path.is_absolute():
@@ -489,7 +548,8 @@ def main() -> None:
     log.info("Conectando a BD: %s", db_url)
     engine = create_engine(db_url, echo=False)
 
-    run_ingesta(args.anio, csv_path, engine)
+    run_ingesta(args.anio, csv_path, engine, formato=args.formato,
+                corp_codigo=args.corp, corp_nombre=args.corp_nom)
 
 
 if __name__ == "__main__":

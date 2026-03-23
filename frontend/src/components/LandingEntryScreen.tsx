@@ -11,14 +11,14 @@ interface LandingEntryScreenProps {
 }
 
 const RESULT_YEARS = [2020, 2021, 2022, 2023, 2024, 2025, 2026] as const;
-const AVAILABLE_YEARS = new Set([2022]);
+const AVAILABLE_YEARS = new Set([2022, 2026]);
 
 export function LandingEntryScreen({
   onEnterPuestos,
   onEnterResultados,
 }: LandingEntryScreenProps) {
   const [selectedView, setSelectedView] = useState<LandingView>("puestos");
-  const [selectedYear, setSelectedYear] = useState<number>(2022);
+  const [selectedYear, setSelectedYear] = useState<number>(2026);
 
   const canEnter =
     selectedView === "puestos" ||
@@ -35,7 +35,7 @@ export function LandingEntryScreen({
   const enterButtonLabel = () => {
     if (selectedView === "jurados") return "Disponible próximamente";
     if (selectedView === "resultados" && !AVAILABLE_YEARS.has(selectedYear))
-      return "Solo disponible 2022";
+      return "Solo disponible 2022 y 2026";
     return "Entrar";
   };
 
