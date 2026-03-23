@@ -72,7 +72,7 @@ const COLOMBIA_BOUNDS: [[number, number], [number, number]] = [
   [13.6, -66.7],
 ];
 
-const NATIONAL_DEFAULT_ZOOM = 6.35;
+const NATIONAL_DEFAULT_ZOOM = 5.8;
 const ZONE_FIT_MAX_ZOOM = 8.7;
 const DEPARTMENT_FIT_MAX_ZOOM = 9.2;
 const MUNICIPALITY_FIT_MAX_ZOOM = 10.2;
@@ -155,7 +155,7 @@ function MapController({
     const bounds = geoJsonLayer.getBounds();
     if (bounds.isValid()) {
       map.setMaxBounds(null as any);
-      map.fitBounds(bounds, { padding: [26, 26], maxZoom: ZONE_FIT_MAX_ZOOM });
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: ZONE_FIT_MAX_ZOOM });
       const colombiaBounds = L.latLngBounds(
         COLOMBIA_BOUNDS[0] as [number, number],
         COLOMBIA_BOUNDS[1] as [number, number],
@@ -304,6 +304,16 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
 
   // Ref to the Leaflet GeoJSON layer so we can update styles without remounting
   const municipiosLayerRef = useRef<L.GeoJSON | null>(null);
+
+  // Ref to the right-side info panel (for mobile auto-scroll on puesto selection)
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to info panel when a puesto is selected on mobile
+  useEffect(() => {
+    if (selectedPuesto && window.innerWidth < 1024) {
+      panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedPuesto]);
 
   const center: [number, number] = currentJurisdiccion
     ? [currentJurisdiccion.center_lat, currentJurisdiccion.center_lon]
@@ -1300,7 +1310,7 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
   return (
     <div className="h-full w-full bg-white lg:p-4">
       <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-2 lg:gap-4">
-        <section className="relative min-h-0 overflow-hidden bg-white lg:rounded-2xl lg:border lg:border-slate-200 lg:shadow-sm">
+        <section className="relative min-h-[55vh] overflow-hidden bg-white lg:min-h-0 lg:rounded-2xl lg:border lg:border-slate-200 lg:shadow-sm">
           <div className="absolute right-20 top-2.5 z-[1000]">
             {!isConsuladosDepartmentView ? (
               <button
@@ -1457,12 +1467,6 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
                         Potencial: {puesto.total.toLocaleString()}
                       </div>
                     )}
-                    <button
-                      className="mt-2 text-xs text-blue-600 underline"
-                      onClick={() => setSelectedPuesto(puesto)}
-                    >
-                      Ver detalles
-                    </button>
                   </div>
                 </Popup>
               </Marker>
@@ -1470,7 +1474,7 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
           </MapContainer>
         </section>
 
-        <div className="min-h-0 lg:pr-4 xl:pr-6">
+        <div ref={panelRef} className="min-h-0 lg:pr-4 xl:pr-6">
           <MapInfoRail
             currentJurisdiccion={currentJurisdiccion}
             activeView={activeView}

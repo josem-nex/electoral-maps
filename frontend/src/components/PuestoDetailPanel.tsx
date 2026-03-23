@@ -30,21 +30,19 @@ export function PuestoDetailPanel({
 
   return (
     <>
-      {/* Overlay oscuro para móvil */}
-      <div
-        className={
-          isRailLayout
-            ? "fixed inset-0 z-[999] bg-black/30 lg:hidden"
-            : "fixed inset-0 bg-black bg-opacity-30 z-[999] md:hidden"
-        }
-        onClick={onClose}
-      />
+      {/* Overlay oscuro para móvil (solo en layout no-rail) */}
+      {!isRailLayout && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-30 z-[999] md:hidden"
+          onClick={onClose}
+        />
+      )}
 
       {/* Panel */}
       <div
         className={
           isRailLayout
-            ? "fixed inset-0 z-[1000] flex flex-col overflow-hidden bg-white shadow-2xl lg:relative lg:inset-auto lg:h-full lg:min-h-0 lg:w-full lg:rounded-2xl lg:border lg:border-slate-200 lg:shadow-xl"
+            ? "relative w-full flex flex-col overflow-hidden bg-white shadow-md lg:h-full lg:min-h-0 lg:w-full lg:rounded-2xl lg:border lg:border-slate-200 lg:shadow-xl"
             : "fixed right-0 top-0 bottom-0 z-[1000] flex w-full flex-col overflow-hidden bg-white shadow-2xl md:bottom-4 md:right-4 md:top-4 md:w-96 md:rounded-lg"
         }
       >

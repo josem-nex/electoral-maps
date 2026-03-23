@@ -123,8 +123,11 @@ export function ResultadosElectoralesPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolved?.nivel, resolved?.nivelCodigo, corporacion, selectedYear]);
 
-  // Display name: prefer API's nivel_nombre, fall back to resolved
-  const displayName = data?.nivel_nombre ?? resolved?.displayName ?? 'Colombia';
+  // Display name: for puestos use the local name (selectedPuesto.puesto) directly,
+  // since the API's nivel_nombre returns the code. For other levels prefer API name.
+  const displayName = resolved?.nivel === 'puesto'
+    ? (resolved.displayName ?? data?.nivel_nombre ?? 'Colombia')
+    : (data?.nivel_nombre ?? resolved?.displayName ?? 'Colombia');
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -136,6 +139,9 @@ export function ResultadosElectoralesPanel({
         <h2 className="mt-1 text-xl font-semibold text-slate-900 truncate" title={displayName}>
           {displayName}
         </h2>
+        {resolved?.nivel === 'puesto' && (
+          <p className="mt-0.5 text-xs text-slate-500 font-mono">{resolved.nivelCodigo}</p>
+        )}
 
         {/* Corporación toggle */}
         <div className="mt-3 flex rounded-lg border border-slate-200 overflow-hidden text-sm font-semibold">

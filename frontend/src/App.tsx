@@ -11,7 +11,7 @@ function App() {
   const [isEntryComplete, setIsEntryComplete] = useState(false);
   const [activeView, setActiveView] = useState<ActiveView>('puestos');
   const [selectedYear, setSelectedYear] = useState<number>(2022);
-  const { currentJurisdiccion, navigateBack, navigationStack, reset } =
+  const { navigateBack, navigationStack, reset } =
     useNavigationStore();
 
   const handleEnterPuestos = () => {
@@ -42,7 +42,7 @@ function App() {
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden">
+    <div className="h-screen w-screen flex flex-col lg:overflow-hidden">
       {/* Header */}
       <header className="z-10 bg-blue-600 text-white">
         <div className="px-4 py-5">
@@ -93,27 +93,11 @@ function App() {
       <Breadcrumbs />
 
       {/* Main Map */}
-      <main className="relative flex-1 min-h-0 bg-white">
+      <main className="relative flex-1 lg:min-h-0 bg-white">
         <ElectoralMap activeView={activeView} selectedYear={selectedYear} />
       </main>
 
-      {/* Footer / Info Panel */}
-      <div className="bg-white border-t px-4 py-2 flex items-center justify-between text-sm text-gray-600 z-10">
-        <div>
-          <span className="font-semibold">Capa actual:</span>{" "}
-          {currentJurisdiccion?.layer === "pais" && "País"}
-          {currentJurisdiccion?.layer === "zonas" && "Zonas"}
-          {currentJurisdiccion?.layer === "departamentos" && "Departamentos"}
-          {currentJurisdiccion?.layer === "municipio" && "Municipio"}
-          {currentJurisdiccion?.layer === "localidad" && "Localidad"}
-          {currentJurisdiccion?.layer === "puesto" && "Puesto Electoral"}
-        </div>
-        <div className="text-xs text-gray-500">
-          {activeView === 'resultados'
-            ? `Resultados Electorales ${selectedYear}`
-            : 'MVP - Sistema de Gestión de Representantes'}
-        </div>
-      </div>
+
     </div>
   );
 }

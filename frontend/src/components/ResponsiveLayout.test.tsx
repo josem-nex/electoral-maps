@@ -67,10 +67,11 @@ describe("Responsive and touch-friendly layout", () => {
     );
 
     const root = container.firstElementChild as HTMLElement;
-    expect(root.className).toContain("fixed");
-    expect(root.className).toContain("inset-x-3");
-    expect(root.className).toContain("bottom-3");
-    expect(root.className).toContain("lg:relative");
-    expect(root.className).toContain("lg:inset-auto");
+    expect(root.className).toContain("relative");
+    expect(root.className).toContain("w-full");
+    expect(root.className).toContain("overflow-y-auto");
+    expect(root.className).not.toContain("fixed");
+    expect(root.className).not.toContain("inset-x-3");
+    expect(root.className).not.toContain("bottom-3");
   });
 });
