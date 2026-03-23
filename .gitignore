@@ -15,8 +15,9 @@ tl.txt
 .github/
 .github
 .claude
-
-
+backend/electoral.db
+/backend/electoral.db
+*electoral.db
 # Jupyter Notebook
 .ipynb_checkpoints
 

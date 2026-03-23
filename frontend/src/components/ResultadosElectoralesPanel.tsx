@@ -26,7 +26,7 @@ function resolveNivel(
   currentJurisdiccion: Jurisdiccion | null,
   selectedMunicipioCode: string | null,
   selectedPuesto: PuestoElectoral | null,
-): { nivel: string; nivelCodigo: string; displayName: string } | null {
+): { nivel: 'pais' | 'zona' | 'departamento' | 'municipio' | 'puesto'; nivelCodigo: string; displayName: string } | null {
   // 1. Puesto takes highest priority
   if (selectedPuesto) {
     return {
