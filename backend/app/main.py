@@ -1201,6 +1201,183 @@ def get_resultados_electorales(
 
 
 # ---------------------------------------------------------------------------
+# Personal Electoral — jurados y testigos
+# ---------------------------------------------------------------------------
+
+from fastapi import UploadFile, File
+from app.db_models import PersonalElectoralORM
+from app.personal_parser import parse_personal_file, TipoPersonal
+
+
+class PersonalEstadoResponse(BaseModel):
+    jurados: int
+    testigos: int
+
+
+class PersonalConteoResponse(BaseModel):
+    jurados: int
+    testigos: int
+
+
+class PersonaResumen(BaseModel):
+    cedula: str
+    primer_nombre: str
+    segundo_nombre: Optional[str]
+    primer_apellido: str
+    segundo_apellido: Optional[str]
+    telefono: Optional[str]
+    celular: Optional[str]
+    correo: Optional[str]
+    direccion: Optional[str]
+    nivel_educativo: Optional[str]
+    referenciado_por: Optional[str]
+    codigo_puesto: str
+
+
+class PersonalPuestoResponse(BaseModel):
+    jurados: List[PersonaResumen]
+    testigos: List[PersonaResumen]
+
+
+class CargaErrorItem(BaseModel):
+    fila: int
+    razon: str
+
+
+class CargaResponse(BaseModel):
+    tipo: str
+    insertados: int
+    omitidos: int
+    errores: List[CargaErrorItem]
+
+
+@app.get("/api/v1/personal/estado", response_model=PersonalEstadoResponse)
+def get_personal_estado(db: Session = Depends(get_db)):
+    """Devuelve cuántos registros hay de cada tipo. Usado para estado vacío en UI."""
+    jurados = db.query(func.count(PersonalElectoralORM.id)).filter(PersonalElectoralORM.tipo == "jurado").scalar() or 0
+    testigos = db.query(func.count(PersonalElectoralORM.id)).filter(PersonalElectoralORM.tipo == "testigo").scalar() or 0
+    return PersonalEstadoResponse(jurados=jurados, testigos=testigos)
+
+
+@app.get("/api/v1/personal/conteos", response_model=PersonalConteoResponse)
+def get_personal_conteos(
+    nivel: str = Query(..., description="pais | zona | departamento | municipio"),
+    codigo: str = Query(..., description="Código del territorio"),
+    db: Session = Depends(get_db),
+):
+    """Devuelve conteo de jurados y testigos para un territorio dado."""
+    valid_niveles = {"pais", "zona", "departamento", "municipio"}
+    if nivel not in valid_niveles:
+        raise HTTPException(status_code=422, detail=f"nivel debe ser uno de: {sorted(valid_niveles)}")
+
+    def count_tipo(tipo: str) -> int:
+        q = db.query(func.count(PersonalElectoralORM.id)).filter(PersonalElectoralORM.tipo == tipo)
+        if nivel == "pais":
+            pass  # no filter
+        elif nivel == "zona":
+            puesto_codigos = db.query(PuestoORM.codigo_puesto).filter(PuestoORM.zona_codigo == codigo)
+            q = q.filter(PersonalElectoralORM.codigo_puesto.in_(puesto_codigos.scalar_subquery()))
+        elif nivel == "departamento":
+            puesto_codigos = db.query(PuestoORM.codigo_puesto).filter(PuestoORM.departamento_codigo == codigo)
+            q = q.filter(PersonalElectoralORM.codigo_puesto.in_(puesto_codigos.scalar_subquery()))
+        elif nivel == "municipio":
+            puesto_codigos = db.query(PuestoORM.codigo_puesto).filter(PuestoORM.municipio_codigo == codigo)
+            q = q.filter(PersonalElectoralORM.codigo_puesto.in_(puesto_codigos.scalar_subquery()))
+        return q.scalar() or 0
+
+    return PersonalConteoResponse(
+        jurados=count_tipo("jurado"),
+        testigos=count_tipo("testigo"),
+    )
+
+
+@app.get("/api/v1/personal/puesto/{codigo_puesto}", response_model=PersonalPuestoResponse)
+def get_personal_por_puesto(codigo_puesto: str, db: Session = Depends(get_db)):
+    """Devuelve listas de jurados y testigos asignados a un puesto específico."""
+    def query_tipo(tipo: str) -> list[PersonaResumen]:
+        rows = (
+            db.query(PersonalElectoralORM)
+            .filter(PersonalElectoralORM.codigo_puesto == codigo_puesto, PersonalElectoralORM.tipo == tipo)
+            .order_by(PersonalElectoralORM.primer_apellido, PersonalElectoralORM.primer_nombre)
+            .all()
+        )
+        return [
+            PersonaResumen(
+                cedula=r.cedula,
+                primer_nombre=r.primer_nombre,
+                segundo_nombre=r.segundo_nombre,
+                primer_apellido=r.primer_apellido,
+                segundo_apellido=r.segundo_apellido,
+                telefono=r.telefono,
+                celular=r.celular,
+                correo=r.correo,
+                direccion=r.direccion,
+                nivel_educativo=r.nivel_educativo,
+                referenciado_por=r.referenciado_por,
+                codigo_puesto=r.codigo_puesto,
+            )
+            for r in rows
+        ]
+
+    return PersonalPuestoResponse(jurados=query_tipo("jurado"), testigos=query_tipo("testigo"))
+
+
+@app.post("/api/v1/personal/cargar", response_model=CargaResponse)
+async def cargar_personal(
+    file: UploadFile = File(...),
+    tipo_override: Optional[str] = Query(None, description="Forzar tipo: 'jurado' o 'testigo'"),
+    db: Session = Depends(get_db),
+):
+    """Carga un archivo .xlsx o .csv de jurados o testigos.
+    Reemplaza todos los registros existentes del mismo tipo detectado.
+    """
+    override: Optional[TipoPersonal] = None
+    if tipo_override in ("jurado", "testigo"):
+        override = tipo_override  # type: ignore[assignment]
+
+    contents = await file.read()
+    filename = file.filename or "upload.xlsx"
+
+    try:
+        result = parse_personal_file(contents, filename, db, tipo_override=override)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    # Replace: delete all existing records of the detected tipo
+    db.query(PersonalElectoralORM).filter(PersonalElectoralORM.tipo == result.tipo).delete()
+
+    # Insert resolved rows (upsert handled by delete-first)
+    for fila in result.filas:
+        db.add(PersonalElectoralORM(**fila))
+
+    db.commit()
+    result.insertados = len(result.filas)
+
+    return CargaResponse(
+        tipo=result.tipo,
+        insertados=result.insertados,
+        omitidos=result.omitidos,
+        errores=[CargaErrorItem(**e) for e in result.errores],
+    )
+
+
+@app.delete("/api/v1/personal/{tipo}")
+def eliminar_personal(
+    tipo: str,
+    db: Session = Depends(get_db),
+):
+    """Elimina todos los registros de un tipo. tipo='todos' elimina jurados y testigos."""
+    if tipo == "todos":
+        deleted = db.query(PersonalElectoralORM).delete()
+    elif tipo in ("jurado", "testigo"):
+        deleted = db.query(PersonalElectoralORM).filter(PersonalElectoralORM.tipo == tipo).delete()
+    else:
+        raise HTTPException(status_code=422, detail="tipo debe ser 'jurado', 'testigo' o 'todos'")
+    db.commit()
+    return {"eliminados": deleted}
+
+
+# ---------------------------------------------------------------------------
 # Entrypoint
 # ---------------------------------------------------------------------------
 

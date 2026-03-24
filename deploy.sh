@@ -31,12 +31,6 @@ fi
 source "$VENV_DIR/bin/activate"
 pip install -r requirements.txt --quiet
 
-# --- 3. Migraciones de base de datos ---
-echo ""
-echo "[3/8] Ejecutando migraciones de base de datos..."
-cd "$BACKEND_DIR"
-alembic upgrade head
-
 
 # --- 5. Refresh cache de estadísticas ---
 echo ""

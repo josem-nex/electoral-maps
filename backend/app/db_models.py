@@ -256,6 +256,41 @@ class ResultadosPuestoORM(Base):
     )
 
 
+class PersonalElectoralORM(Base):
+    __tablename__ = "personal_electoral"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    tipo: Mapped[str] = mapped_column(String(16), nullable=False, index=True)  # 'jurado' | 'testigo'
+    cedula: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    primer_nombre: Mapped[str] = mapped_column(String(64), nullable=False)
+    segundo_nombre: Mapped[str | None] = mapped_column(String(64))
+    primer_apellido: Mapped[str] = mapped_column(String(64), nullable=False)
+    segundo_apellido: Mapped[str | None] = mapped_column(String(64))
+    telefono: Mapped[str | None] = mapped_column(String(32))
+    celular: Mapped[str | None] = mapped_column(String(32))
+    correo: Mapped[str | None] = mapped_column(String(128))
+    codigo_puesto: Mapped[str] = mapped_column(
+        String(32), ForeignKey("puestos_electorales.codigo_puesto", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    # Jurado-specific
+    direccion: Mapped[str | None] = mapped_column(String(256))
+    nivel_educativo: Mapped[str | None] = mapped_column(String(64))
+    # Testigo-specific / shared
+    referenciado_por: Mapped[str | None] = mapped_column(String(160))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
+    )
+
+    puesto = relationship("PuestoORM")
+
+    __table_args__ = (
+        UniqueConstraint("cedula", "tipo", "codigo_puesto", name="uq_personal_cedula_tipo_puesto"),
+        Index("ix_personal_tipo_codigo_puesto", "tipo", "codigo_puesto"),
+    )
+
+
 class TerritorioStatsCacheORM(Base):
     __tablename__ = "territorio_stats_cache"
 

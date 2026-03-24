@@ -3,10 +3,11 @@ import backgroundImage from "../../../data/images/image_fondo_colombia.jpg";
 import companyLogo from "../../../data/images/LOGO FINAL E DAY TECH.png";
 import colombiaFlag from "../../../data/images/image_download.png";
 
-type LandingView = "puestos" | "jurados" | "resultados";
+type LandingView = "puestos" | "jurados-testigos" | "resultados";
 
 interface LandingEntryScreenProps {
   onEnterPuestos: () => void;
+  onEnterJuradosTestigos: () => void;
   onEnterResultados: (year: number) => void;
 }
 
@@ -15,6 +16,7 @@ const AVAILABLE_YEARS = new Set([2022, 2026]);
 
 export function LandingEntryScreen({
   onEnterPuestos,
+  onEnterJuradosTestigos,
   onEnterResultados,
 }: LandingEntryScreenProps) {
   const [selectedView, setSelectedView] = useState<LandingView>("puestos");
@@ -22,18 +24,20 @@ export function LandingEntryScreen({
 
   const canEnter =
     selectedView === "puestos" ||
+    selectedView === "jurados-testigos" ||
     (selectedView === "resultados" && AVAILABLE_YEARS.has(selectedYear));
 
   const handleContinue = () => {
     if (selectedView === "puestos") {
       onEnterPuestos();
+    } else if (selectedView === "jurados-testigos") {
+      onEnterJuradosTestigos();
     } else if (selectedView === "resultados" && AVAILABLE_YEARS.has(selectedYear)) {
       onEnterResultados(selectedYear);
     }
   };
 
   const enterButtonLabel = () => {
-    if (selectedView === "jurados") return "Disponible próximamente";
     if (selectedView === "resultados" && !AVAILABLE_YEARS.has(selectedYear))
       return "Solo disponible 2022 y 2026";
     return "Entrar";
@@ -97,15 +101,15 @@ export function LandingEntryScreen({
 
             <button
               type="button"
-              onClick={() => setSelectedView("jurados")}
+              onClick={() => setSelectedView("jurados-testigos")}
               className={`flex min-h-[96px] items-center justify-center rounded-xl border px-6 py-7 text-center transition ${
-                selectedView === "jurados"
+                selectedView === "jurados-testigos"
                   ? "border-blue-700 bg-blue-50"
                   : "border-slate-200 bg-white hover:border-slate-300"
               }`}
             >
               <p className="text-lg font-semibold text-slate-900 sm:text-xl">
-                INFORMACIÓN JURADOS
+                JURADOS Y TESTIGOS
               </p>
             </button>
 

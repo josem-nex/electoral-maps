@@ -4,6 +4,7 @@ import type { ActiveView } from "../App";
 import { PuestoDetailPanel } from "./PuestoDetailPanel";
 import { TeritorioStatsPanel } from "./TeritorioStatsPanel";
 import { ResultadosElectoralesPanel } from "./ResultadosElectoralesPanel";
+import { JuradosTestigosPanel } from "./JuradosTestigosPanel";
 
 interface PuestoTerritoryContext {
   municipio: string | null;
@@ -74,6 +75,17 @@ export function MapInfoRail({
           currentJurisdiccion={currentJurisdiccion}
           selectedPuesto={selectedPuesto}
           selectedYear={selectedYear}
+        />
+      </div>
+    );
+  }
+
+  if (activeView === 'jurados-testigos') {
+    return (
+      <div className="contents lg:block lg:h-full lg:min-h-0">
+        <JuradosTestigosPanel
+          currentJurisdiccion={currentJurisdiccion}
+          selectedPuesto={selectedPuesto}
         />
       </div>
     );

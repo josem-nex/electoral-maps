@@ -5,7 +5,7 @@ import { SearchBar } from "./components/SearchBar";
 import { LandingEntryScreen } from "./components/LandingEntryScreen";
 import { useNavigationStore } from "./stores/navigationStore";
 
-export type ActiveView = 'puestos' | 'resultados';
+export type ActiveView = 'puestos' | 'resultados' | 'jurados-testigos';
 
 function App() {
   const [isEntryComplete, setIsEntryComplete] = useState(false);
@@ -17,6 +17,12 @@ function App() {
   const handleEnterPuestos = () => {
     reset();
     setActiveView('puestos');
+    setIsEntryComplete(true);
+  };
+
+  const handleEnterJuradosTestigos = () => {
+    reset();
+    setActiveView('jurados-testigos');
     setIsEntryComplete(true);
   };
 
@@ -36,6 +42,7 @@ function App() {
     return (
       <LandingEntryScreen
         onEnterPuestos={handleEnterPuestos}
+        onEnterJuradosTestigos={handleEnterJuradosTestigos}
         onEnterResultados={handleEnterResultados}
       />
     );

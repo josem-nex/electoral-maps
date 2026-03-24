@@ -77,6 +77,48 @@ export interface ResultadosElectorales {
   partidos: ResultadosPartido[];
 }
 
+export interface PersonalEstado {
+  jurados: number;
+  testigos: number;
+}
+
+export interface PersonalConteo {
+  jurados: number;
+  testigos: number;
+}
+
+export interface PersonaResumen {
+  cedula: string;
+  primer_nombre: string;
+  segundo_nombre: string | null;
+  primer_apellido: string;
+  segundo_apellido: string | null;
+  telefono: string | null;
+  celular: string | null;
+  correo: string | null;
+  direccion: string | null;
+  nivel_educativo: string | null;
+  referenciado_por: string | null;
+  codigo_puesto: string;
+}
+
+export interface PersonalPuesto {
+  jurados: PersonaResumen[];
+  testigos: PersonaResumen[];
+}
+
+export interface CargaErrorItem {
+  fila: number;
+  razon: string;
+}
+
+export interface CargaResponse {
+  tipo: string;
+  insertados: number;
+  omitidos: number;
+  errores: CargaErrorItem[];
+}
+
 export const api = {
   // Get jurisdictions by layer
   async getJurisdicciones(layer: ElectoralLayer, parentCode?: string): Promise<Jurisdiccion[]> {
@@ -171,6 +213,43 @@ export const api = {
     const response = await apiClient.get('/api/v1/analytics/territorio', {
       params: { tipo, codigo },
     });
+    return response.data;
+  },
+
+  // Personal electoral — jurados y testigos
+  async getPersonalEstado(): Promise<PersonalEstado> {
+    const response = await apiClient.get('/api/v1/personal/estado');
+    return response.data;
+  },
+
+  async getPersonalConteos(
+    nivel: 'pais' | 'zona' | 'departamento' | 'municipio',
+    codigo: string,
+  ): Promise<PersonalConteo> {
+    const response = await apiClient.get('/api/v1/personal/conteos', {
+      params: { nivel, codigo },
+    });
+    return response.data;
+  },
+
+  async getPersonalPuesto(codigoPuesto: string): Promise<PersonalPuesto> {
+    const response = await apiClient.get(`/api/v1/personal/puesto/${codigoPuesto}`);
+    return response.data;
+  },
+
+  async cargarPersonal(file: File, tipoOverride?: 'jurado' | 'testigo'): Promise<CargaResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const params = tipoOverride ? { tipo_override: tipoOverride } : {};
+    const response = await apiClient.post('/api/v1/personal/cargar', formData, {
+      params,
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  async eliminarPersonal(tipo: 'jurado' | 'testigo' | 'todos'): Promise<{ eliminados: number }> {
+    const response = await apiClient.delete(`/api/v1/personal/${tipo}`);
     return response.data;
   },
 };
