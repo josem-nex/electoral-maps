@@ -10,7 +10,48 @@ interface ResultadosElectoralesPanelProps {
   selectedYear: number;
 }
 
-type Corporacion = '001' | '002';
+type EleccionTab = 'senado' | 'camara' | 'presidencial' | 'territoriales';
+
+const TABS_BY_YEAR: Record<number, EleccionTab[]> = {
+  2026: ['senado', 'camara'],
+  2022: ['senado', 'camara', 'presidencial'],
+  2018: ['presidencial'],
+  2019: ['territoriales'],
+  2023: ['territoriales'],
+};
+
+const TAB_LABELS: Record<EleccionTab, string> = {
+  senado: 'SENADO',
+  camara: 'CÁMARA',
+  presidencial: 'PRESIDENCIAL',
+  territoriales: 'TERRITORIALES',
+};
+
+const VUELTA_OPTIONS = [
+  { value: '1', label: '1ª Vuelta', corp: 'P01' },
+  { value: '2', label: '2ª Vuelta', corp: 'P02' },
+] as const;
+
+const TERRITORIAL_OPTIONS = [
+  { value: '001', label: 'GOBERNADOR' },
+  { value: '002', label: 'ASAMBLEA' },
+  { value: '003', label: 'ALCALDE' },
+  { value: '004', label: 'CONCEJO' },
+  { value: '005', label: 'JAL' },
+] as const;
+
+function deriveCorporacion(
+  tab: EleccionTab,
+  vuelta: string,
+  territorialCorp: string,
+): string {
+  switch (tab) {
+    case 'senado': return '001';
+    case 'camara': return '002';
+    case 'presidencial': return vuelta === '2' ? 'P02' : 'P01';
+    case 'territoriales': return territorialCorp;
+  }
+}
 
 function formatNum(n: number): string {
   return n.toLocaleString('es-CO');
@@ -99,10 +140,26 @@ export function ResultadosElectoralesPanel({
 }: ResultadosElectoralesPanelProps) {
   const selectedMunicipioCode = useNavigationStore((s) => s.selectedMunicipioCode);
 
-  const [corporacion, setCorporacion] = useState<Corporacion>('001');
+  const availableTabs = TABS_BY_YEAR[selectedYear] ?? ['senado', 'camara'];
+  const [activeTab, setActiveTab] = useState<EleccionTab>(availableTabs[0]);
+  const [vuelta, setVuelta] = useState('1');
+  const [territorialCorp, setTerritorialCorp] = useState('001');
   const [data, setData] = useState<ResultadosElectorales | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Reset tab when year changes
+  useEffect(() => {
+    const tabs = TABS_BY_YEAR[selectedYear] ?? ['senado', 'camara'];
+    if (!tabs.includes(activeTab)) {
+      setActiveTab(tabs[0]);
+    }
+    setVuelta('1');
+    setTerritorialCorp('001');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear]);
+
+  const corporacion = deriveCorporacion(activeTab, vuelta, territorialCorp);
 
   const resolved = resolveNivel(currentJurisdiccion, selectedMunicipioCode, selectedPuesto);
 
@@ -143,31 +200,60 @@ export function ResultadosElectoralesPanel({
           <p className="mt-0.5 text-xs text-slate-500 font-mono">{resolved.nivelCodigo}</p>
         )}
 
-        {/* Corporación toggle */}
+        {/* Tabs de tipo de elección */}
         <div className="mt-3 flex rounded-lg border border-slate-200 overflow-hidden text-sm font-semibold">
-          <button
-            type="button"
-            onClick={() => setCorporacion('001')}
-            className={`flex-1 py-2 transition ${
-              corporacion === '001'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            SENADO
-          </button>
-          <button
-            type="button"
-            onClick={() => setCorporacion('002')}
-            className={`flex-1 py-2 transition border-l border-slate-200 ${
-              corporacion === '002'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            CÁMARA
-          </button>
+          {availableTabs.map((tab, i) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 py-2 transition ${i > 0 ? 'border-l border-slate-200' : ''} ${
+                activeTab === tab
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {TAB_LABELS[tab]}
+            </button>
+          ))}
         </div>
+
+        {/* Sub-selector: vuelta presidencial */}
+        {activeTab === 'presidencial' && (
+          <div className="mt-2 flex rounded-lg border border-slate-200 overflow-hidden text-xs font-semibold">
+            {VUELTA_OPTIONS.map((v, i) => (
+              <button
+                key={v.value}
+                type="button"
+                onClick={() => setVuelta(v.value)}
+                className={`flex-1 py-1.5 transition ${i > 0 ? 'border-l border-slate-200' : ''} ${
+                  vuelta === v.value
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Sub-selector: corporación territorial */}
+        {activeTab === 'territoriales' && (
+          <div className="mt-2">
+            <select
+              value={territorialCorp}
+              onChange={(e) => setTerritorialCorp(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700"
+            >
+              {TERRITORIAL_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Body */}

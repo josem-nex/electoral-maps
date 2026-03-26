@@ -218,6 +218,24 @@ def top5(candidatos: dict) -> list:
     ]
 
 
+def classify_can(can_str: str, formato: str) -> str:
+    """Clasifica un código CAN en tipo de voto.
+
+    Formatos 2022/2026 (SENADO/CAMARA): 996=nulo, 997=blanco, 998=total_mesa.
+    Formatos nuevos (pres-xlsx, territoriales): 996=blanco, 997=nulo, 998=total_mesa.
+    """
+    normalized = can_str.strip().lstrip("0") or "0"
+    if formato in _NEW_FORMATS:
+        if normalized == "997": return "nulo"
+        if normalized == "996": return "blanco"
+        if normalized == "998": return "total_mesa"
+    else:
+        if normalized == "996": return "nulo"
+        if normalized == "997": return "blanco"
+        if normalized == "998": return "total_mesa"
+    return "candidato"
+
+
 # ── main ingesta ──────────────────────────────────────────────────────────────
 
 # ── column mapping for formato 2026 ──────────────────────────────────────────
@@ -234,6 +252,41 @@ COLS_2026 = {
     "Candidato_Nom": "CANNOMBRE",
     "Votos": "VOTOS",
 }
+
+# ── column mapping for territoriales format (2019/2023) ──────────────────────
+# CSV: comma-separated, utf-8-sig, columnas en español con código de corporación incluido.
+# La corporación se lee directamente del CSV (modo multi-corp, sin --corp).
+COLS_TERRITORIALES = {
+    "Código Departamento": "DEP",
+    "Código Municipio": "MUN",
+    "Código Zona": "ZONA",
+    "Código Puesto": "PUESTO",
+    "Nombre Puesto": "PUESNOMBRE",
+    "Mesa": "MESA",
+    "Código Corporación": "CORCODIGO",
+    "Nombre Corporación": "CONOMBRE",
+    "Código Partido": "PAR",
+    "Nombre Partido": "PARNOMBRE",
+    "Código Candidato": "CAN",
+    "Nombre Candidato": "CANNOMBRE",
+    "Total Votos": "VOTOS",
+}
+
+# ── column mapping for pres-xlsx format (2018 xlsx) ──────────────────────────
+# 1v sheet "MMV ESCRUTINIO FINAL": DEP,MUN,ZONA,PSTO,MESA,COR,CIR,PAR,PARTIDO  ,CODCAN,CANDIDATO,VOTOS
+# 2v sheet only: DEP,MUN,ZONA,PUESTO,MESA,COR,CIR,PAR,CAN,CANDIDATO,VOTOS
+# Valores son enteros; se zero-pad a DEP=2, MUN=3, PUESTO=2, PAR=4, CAN=3 dígitos.
+COLS_PRES_XLSX = {
+    "PSTO": "PUESTO",      # 1v usa PSTO, 2v ya trae PUESTO
+    "CODCAN": "CAN",       # 1v usa CODCAN, 2v ya trae CAN
+    "CANDIDATO": "CANNOMBRE",
+    # PARTIDO (con espacios al final) → PARNOMBRE; se maneja dinámicamente
+}
+
+# ── CAN codes: standard vs new formats ───────────────────────────────────────
+# Formato 2022/2026 SENADO/CAMARA: 996=nulo, 997=blanco, 998=total_mesa
+# Formatos nuevos (pres-xlsx, territoriales): 996=blanco, 997=nulo, 998=total_mesa
+_NEW_FORMATS = frozenset({"pres-xlsx", "territoriales"})
 
 
 def run_ingesta(anio: int, csv_path: Path, engine, *,
@@ -260,34 +313,104 @@ def run_ingesta(anio: int, csv_path: Path, engine, *,
     total_rows = 0
     skipped = 0
 
-    log.info("Procesando CSV en chunks de %d filas… (formato=%s)", CHUNK_SIZE, formato)
+    log.info("Procesando datos en chunks de %d filas… (formato=%s)", CHUNK_SIZE, formato)
 
-    if formato == "2026":
-        sep, encoding = ",", "utf-8"
+    # ── Cargar datos según formato ────────────────────────────────────────────
+    if formato == "pres-xlsx":
+        # Leer xlsx: intentar hoja "MMV ESCRUTINIO FINAL", sino hoja activa
+        import openpyxl  # noqa: F401 – verifica disponibilidad
+        xls = pd.ExcelFile(csv_path, engine="openpyxl")
+        sheet = "MMV ESCRUTINIO FINAL" if "MMV ESCRUTINIO FINAL" in xls.sheet_names else xls.sheet_names[0]
+        log.info("  Leyendo hoja '%s' de xlsx…", sheet)
+        df_xlsx = pd.read_excel(xls, sheet_name=sheet, dtype=object)
+
+        # Normalizar nombres de columna (strip espacios)
+        df_xlsx.columns = [str(c).strip() for c in df_xlsx.columns]
+        # Renombrar a nombres internos
+        df_xlsx = df_xlsx.rename(columns=COLS_PRES_XLSX)
+        # Si no hay PARNOMBRE, crear columna vacía (2v no tiene columna de partido)
+        if "PARNOMBRE" not in df_xlsx.columns:
+            df_xlsx["PARNOMBRE"] = ""
+        # Si no hay PUESNOMBRE, crear columna vacía (xlsx no trae nombre de puesto)
+        if "PUESNOMBRE" not in df_xlsx.columns:
+            df_xlsx["PUESNOMBRE"] = ""
+        # Convertir enteros a strings con zero-padding.
+        # Valores no-numéricos (ej. "A1" para puestos en consulados) se preservan como string;
+        # el lookup de puestos los tratará como no-matcheados y acumulará a niveles superiores.
+        def _pad_int(x, width: int, fallback: str = "") -> str:
+            if pd.isna(x) or x == "":
+                return fallback
+            try:
+                return str(int(x)).zfill(width)
+            except (ValueError, TypeError):
+                return str(x)
+
+        for col, width in [("DEP", 2), ("MUN", 3), ("ZONA", 2), ("PUESTO", 2)]:
+            df_xlsx[col] = df_xlsx[col].apply(lambda x, w=width: _pad_int(x, w))
+        df_xlsx["PAR"] = df_xlsx["PAR"].apply(lambda x: _pad_int(x, 4, "0000"))
+        df_xlsx["CAN"] = df_xlsx["CAN"].apply(lambda x: _pad_int(x, 3, "000"))
+        df_xlsx["MESA"] = df_xlsx["MESA"].apply(
+            lambda x: str(int(x)) if pd.notna(x) and x != "" and isinstance(x, (int, float)) else str(x) if pd.notna(x) else ""
+        )
+        df_xlsx["VOTOS"] = df_xlsx["VOTOS"].apply(
+            lambda x: int(x) if pd.notna(x) and x != "" else 0
+        )
+        df_xlsx = df_xlsx.fillna("")
+        df_xlsx["VOTOS"] = df_xlsx["VOTOS"].apply(lambda x: int(x) if x != "" else 0)
+        # Corporación siempre viene de --corp para pres-xlsx
+        df_xlsx["CORCODIGO"] = corp_codigo or ""
+        df_xlsx["CONOMBRE"] = corp_nombre or ""
+        # Yield como chunks
+        csv_iter = (df_xlsx.iloc[i:i + CHUNK_SIZE] for i in range(0, max(1, len(df_xlsx)), CHUNK_SIZE))
+
+    elif formato == "territoriales":
+        csv_iter = pd.read_csv(
+            csv_path,
+            sep=",",
+            chunksize=CHUNK_SIZE,
+            dtype=str,
+            keep_default_na=False,
+            encoding="utf-8-sig",
+        )
+    elif formato == "2026":
+        csv_iter = pd.read_csv(
+            csv_path,
+            sep=",",
+            chunksize=CHUNK_SIZE,
+            dtype=str,
+            keep_default_na=False,
+            encoding="utf-8",
+        )
     else:
-        sep, encoding = ";", "latin-1"
+        csv_iter = pd.read_csv(
+            csv_path,
+            sep=";",
+            chunksize=CHUNK_SIZE,
+            dtype=str,
+            keep_default_na=False,
+            encoding="latin-1",
+        )
 
-    csv_iter = pd.read_csv(
-        csv_path,
-        sep=sep,
-        chunksize=CHUNK_SIZE,
-        dtype=str,
-        keep_default_na=False,
-        encoding=encoding,
-    )
-
+    # ── Iterar chunks ─────────────────────────────────────────────────────────
     for chunk_idx, chunk in enumerate(csv_iter):
-        # Normalize column names for formato 2026
+        # Normalize column names
         if formato == "2026":
             chunk = chunk.rename(columns=COLS_2026)
+        elif formato == "territoriales":
+            chunk = chunk.rename(columns=COLS_TERRITORIALES)
 
         for col in ["DEP", "MUN", "ZONA", "PUESTO", "PUESNOMBRE", "CORCODIGO", "CONOMBRE",
                     "PAR", "PARNOMBRE", "CAN", "CANNOMBRE", "VOTOS"]:
             if col in chunk.columns:
-                chunk[col] = chunk[col].str.strip()
+                chunk[col] = chunk[col].astype(str).str.strip()
 
-        # Drop total-mesa rows
-        chunk = chunk[chunk["CAN"] != CAN_TOTAL_MESA]
+        # Filtrar por corporación cuando se provee --corp con formato territoriales.
+        # Esto permite procesar una corporación a la vez, reduciendo memoria y CPU.
+        if formato == "territoriales" and corp_codigo and "CORCODIGO" in chunk.columns:
+            chunk = chunk[chunk["CORCODIGO"] == corp_codigo]
+
+        # Drop total-mesa rows (detect via classify_can to handle all formats)
+        chunk = chunk[chunk["CAN"].apply(lambda c: classify_can(str(c), formato) != "total_mesa")]
         total_rows += len(chunk)
 
         for row in chunk.itertuples(index=False):
@@ -295,16 +418,18 @@ def run_ingesta(anio: int, csv_path: Path, engine, *,
             mun = row.MUN
             zona = row.ZONA
             puesto_raw = row.PUESTO
-            # En formato 2026 la corporación viene de los args, no del CSV
-            if formato == "2026":
+            # Corporación: si --corp se provee, tiene prioridad sobre el CSV en todos los formatos.
+            # Solo en modo multi-corp (territoriales sin --corp) se lee del CSV.
+            if corp_codigo:
                 _corp_codigo = corp_codigo
                 _corp_nombre = corp_nombre
             else:
-                _corp_codigo = row.CORCODIGO
-                _corp_nombre = row.CONOMBRE
+                # Modo multi-corp: leer del CSV (territoriales)
+                _corp_codigo = row.CORCODIGO if hasattr(row, "CORCODIGO") else ""
+                _corp_nombre = row.CONOMBRE if hasattr(row, "CONOMBRE") else ""
             par_codigo = row.PAR
             par_nombre = row.PARNOMBRE
-            can_codigo = row.CAN
+            can_codigo = str(row.CAN)
             can_nombre = row.CANNOMBRE
             try:
                 votos = int(row.VOTOS)
@@ -315,14 +440,13 @@ def run_ingesta(anio: int, csv_path: Path, engine, *,
                 continue
 
             # Classify
-            if can_codigo == CAN_NULO:
-                tipo = "nulo"
-            elif can_codigo == CAN_BLANCO:
-                tipo = "blanco"
-            else:
-                tipo = "candidato"
-                # Skip no-party rows (PAR=0000 en 2022, PAR=00000/NO ENCONTRADO en 2026)
-                if par_codigo in ("0000", "00000") or par_nombre in (r"\N", "NO ENCONTRADO"):
+            tipo = classify_can(can_codigo, formato)
+            if tipo == "total_mesa":
+                continue
+            if tipo == "candidato":
+                # Skip no-party rows (PAR=0000 en 2022, PAR=00000/NO ENCONTRADO en 2026/territoriales)
+                par_normalized = par_codigo.lstrip("0") or "0"
+                if par_normalized == "0" or par_nombre in (r"\N", "NO ENCONTRADO", "N/A", "CANDIDATOS TOTALES"):
                     continue
 
             # Build codigo_puesto
@@ -389,9 +513,10 @@ def run_ingesta(anio: int, csv_path: Path, engine, *,
         log.warning("%d filas no encontradas → %s", len(error_lines), error_path)
 
     # ── Truncate and reload ────────────────────────────────────────────────
-    # Para formato 2026 (dos ejecuciones separadas) acotamos por corporacion_codigo
-    # para no borrar SENADO al ingestar CÁMARA (y viceversa).
-    if formato == "2026":
+    # Siempre acotamos por corporacion_codigo cuando se provee --corp para no
+    # borrar datos de otras corporaciones del mismo año.
+    if corp_codigo:
+        # Corp fija vía --corp: borrar solo esa corporación
         log.info("Eliminando registros previos del año %d, corporacion=%s…", anio, corp_codigo)
         with engine.begin() as conn:
             for table in ("resultados_pais", "resultados_departamento", "resultados_municipio", "resultados_puesto"):
@@ -399,11 +524,67 @@ def run_ingesta(anio: int, csv_path: Path, engine, *,
                     text(f"DELETE FROM {table} WHERE anio = :anio AND corporacion_codigo = :corp"),
                     {"anio": anio, "corp": corp_codigo},
                 )
+    elif formato == "territoriales":
+        # Multi-corp: borrar cada corporación encontrada en los datos procesados
+        corps_found = {k[0] if isinstance(k, tuple) else k
+                       for k in pais_totals.keys()}
+        log.info("Eliminando registros previos del año %d, corporaciones=%s…", anio, sorted(corps_found))
+        with engine.begin() as conn:
+            for corp in corps_found:
+                for table in ("resultados_pais", "resultados_departamento", "resultados_municipio", "resultados_puesto"):
+                    conn.execute(
+                        text(f"DELETE FROM {table} WHERE anio = :anio AND corporacion_codigo = :corp"),
+                        {"anio": anio, "corp": corp},
+                    )
     else:
         log.info("Eliminando registros previos del año %d…", anio)
         with engine.begin() as conn:
             for table in ("resultados_pais", "resultados_departamento", "resultados_municipio", "resultados_puesto"):
                 conn.execute(text(f"DELETE FROM {table} WHERE anio = :anio"), {"anio": anio})
+
+    # ── Merge entries with same partido_codigo but different nombre ─────────
+    # En elecciones territoriales el mismo partido puede tener variaciones de nombre
+    # entre municipios. Merge para evitar UNIQUE constraint violations.
+    def _merge_partidos(store: dict, key_partido_idx: int, key_nombre_idx: int) -> dict:
+        """Merge partido entries that share the same key except for par_nombre."""
+        merged: dict = {}
+        for key, pdata in store.items():
+            # Build canonical key: replace par_nombre with empty string
+            canon = list(key)
+            nombre = canon[key_nombre_idx]
+            canon[key_nombre_idx] = ""
+            canon_key = tuple(canon)
+            if canon_key not in merged:
+                merged[canon_key] = {"pdata": dict(pdata), "nombre": nombre, "votos": pdata["votos_validos"]}
+            else:
+                # Merge votos
+                merged[canon_key]["pdata"]["votos_validos"] += pdata["votos_validos"]
+                # Merge candidatos
+                for c_key, c_val in pdata["candidatos"].items():
+                    if c_key in merged[canon_key]["pdata"]["candidatos"]:
+                        merged[canon_key]["pdata"]["candidatos"][c_key]["votos"] += c_val["votos"]
+                    else:
+                        merged[canon_key]["pdata"]["candidatos"][c_key] = dict(c_val)
+                # Keep the nombre with more votes
+                if pdata["votos_validos"] > merged[canon_key]["votos"]:
+                    merged[canon_key]["nombre"] = nombre
+                    merged[canon_key]["votos"] = pdata["votos_validos"]
+        # Rebuild dict with canonical nombre
+        result: dict = {}
+        for canon_key, mdata in merged.items():
+            real_key = list(canon_key)
+            real_key[key_nombre_idx] = mdata["nombre"]
+            result[tuple(real_key)] = mdata["pdata"]
+        return result
+
+    # key indices: pais=(corp, par, par_nombre, corp_nombre) → par_nombre at [2]
+    pais_partidos = _merge_partidos(pais_partidos, 1, 2)
+    # dep=(dep, corp, par, par_nombre, corp_nombre) → par_nombre at [3]
+    dep_partidos = _merge_partidos(dep_partidos, 2, 3)
+    # mun=(mun, dep, corp, par, par_nombre, corp_nombre) → par_nombre at [4]
+    mun_partidos = _merge_partidos(mun_partidos, 3, 4)
+    # puesto=(puesto, mun, dep, corp, par, par_nombre, corp_nombre) → par_nombre at [5]
+    puesto_partidos = _merge_partidos(puesto_partidos, 4, 5)
 
     # ── Insert resultados_pais ─────────────────────────────────────────────
     log.info("Insertando resultados_pais…")
@@ -516,21 +697,27 @@ def main() -> None:
     parser.add_argument("--anio", type=int, required=True, help="Año electoral (ej. 2022)")
     parser.add_argument("--csv", type=Path, required=True, help="Ruta al archivo CSV")
     parser.add_argument(
-        "--formato", choices=["2022", "2026"], default="2022",
-        help="Formato del CSV: '2022' (sep=;, latin-1) o '2026' (sep=,, utf-8, columnas nuevas)",
+        "--formato",
+        choices=["2022", "2026", "pres-xlsx", "territoriales"],
+        default="2022",
+        help=(
+            "Formato del archivo: '2022' (sep=;, latin-1), '2026' (sep=,, utf-8, columnas Departamento_ID...), "
+            "'pres-xlsx' (xlsx 2018, hoja MMV ESCRUTINIO FINAL), "
+            "'territoriales' (sep=,, utf-8-sig, columnas en español con corporación incluida — modo multi-corp)"
+        ),
     )
     parser.add_argument(
         "--corp", default=None,
-        help="Código de corporación para formato 2026 (ej. '001'). Requerido con --formato 2026.",
+        help="Código de corporación (ej. '001', 'P01'). Requerido con --formato 2026 y pres-xlsx. Ignorado con territoriales.",
     )
     parser.add_argument(
         "--corp-nom", default=None, dest="corp_nom",
-        help="Nombre de corporación para formato 2026 (ej. 'SENADO'). Requerido con --formato 2026.",
+        help="Nombre de corporación (ej. 'SENADO'). Requerido con --formato 2026 y pres-xlsx.",
     )
     args = parser.parse_args()
 
-    if args.formato == "2026" and (not args.corp or not args.corp_nom):
-        parser.error("--corp y --corp-nom son requeridos cuando --formato es '2026'")
+    if args.formato in ("2026", "pres-xlsx") and (not args.corp or not args.corp_nom):
+        parser.error("--corp y --corp-nom son requeridos cuando --formato es '2026' o 'pres-xlsx'")
 
     csv_path = args.csv
     if not csv_path.is_absolute():

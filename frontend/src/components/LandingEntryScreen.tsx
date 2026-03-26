@@ -11,8 +11,7 @@ interface LandingEntryScreenProps {
   onEnterResultados: (year: number) => void;
 }
 
-const RESULT_YEARS = [2020, 2021, 2022, 2023, 2024, 2025, 2026] as const;
-const AVAILABLE_YEARS = new Set([2022, 2026]);
+const RESULT_YEARS = [2018, 2019, 2022, 2023, 2026] as const;
 
 export function LandingEntryScreen({
   onEnterPuestos,
@@ -25,23 +24,19 @@ export function LandingEntryScreen({
   const canEnter =
     selectedView === "puestos" ||
     selectedView === "jurados-testigos" ||
-    (selectedView === "resultados" && AVAILABLE_YEARS.has(selectedYear));
+    selectedView === "resultados";
 
   const handleContinue = () => {
     if (selectedView === "puestos") {
       onEnterPuestos();
     } else if (selectedView === "jurados-testigos") {
       onEnterJuradosTestigos();
-    } else if (selectedView === "resultados" && AVAILABLE_YEARS.has(selectedYear)) {
+    } else if (selectedView === "resultados") {
       onEnterResultados(selectedYear);
     }
   };
 
-  const enterButtonLabel = () => {
-    if (selectedView === "resultados" && !AVAILABLE_YEARS.has(selectedYear))
-      return "Solo disponible 2022 y 2026";
-    return "Entrar";
-  };
+  const enterButtonLabel = () => "Entrar";
 
   return (
     <div className="min-h-screen w-screen bg-slate-50">
@@ -146,8 +141,8 @@ export function LandingEntryScreen({
                   className="w-full max-w-sm rounded-lg border border-slate-300 bg-white px-4 py-3 text-center text-lg text-slate-900 [text-align-last:center]"
                 >
                   {RESULT_YEARS.map((year) => (
-                    <option key={year} value={year} disabled={!AVAILABLE_YEARS.has(year)}>
-                      {year}{!AVAILABLE_YEARS.has(year) ? " (próximamente)" : ""}
+                    <option key={year} value={year}>
+                      {year}
                     </option>
                   ))}
                 </select>

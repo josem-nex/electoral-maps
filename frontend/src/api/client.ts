@@ -196,7 +196,7 @@ export const api = {
   async getResultadosElectorales(
     nivel: 'pais' | 'zona' | 'departamento' | 'municipio' | 'puesto',
     nivel_codigo: string,
-    corporacion: '001' | '002',
+    corporacion: string,
     anio: number,
   ): Promise<ResultadosElectorales> {
     const response = await apiClient.get('/api/v1/resultados/electorales', {
