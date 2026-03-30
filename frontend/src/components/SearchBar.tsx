@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "../api/client";
 import type { SearchResult } from "../api/client";
 import { useNavigationStore } from "../stores/navigationStore";
@@ -14,6 +15,13 @@ export function SearchBar() {
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const { navigateTo, setSelectedMunicipioCode, reset } = useNavigationStore();
+  const navigate = useNavigate();
+  const location = useLocation();
+  // Derive view base path including year for resultados (e.g. '/resultados/2026' or '/puestos')
+  const segments = location.pathname.split('/').filter(Boolean);
+  const viewPath = segments[0] === 'resultados'
+    ? `/${segments[0]}/${segments[1] ?? ''}`
+    : `/${segments[0] ?? ''}`;
 
   const handleSearch = async (searchQuery: string) => {
     setQuery(searchQuery);
@@ -51,41 +59,59 @@ export function SearchBar() {
         }
 
         reset();
-        const departamentos = await api.getJurisdicciones("departamentos");
-        const dept = departamentos.find(
+        const catalog = await api.getDepartamentosCatalog();
+        const catalogDept = catalog.find(
           (d) => normalizeDepartmentCode(d.code) === parentDepartmentCode,
         );
 
-        if (dept) {
-          navigateTo(dept);
-          setSelectedMunicipioCode(municipioCode);
-        } else {
-          const fallbackDept: Jurisdiccion = {
-            id: `dept:${parentDepartmentCode}`,
-            layer: "departamentos",
-            name: result.parent_name || `Departamento ${parentDepartmentCode}`,
-            code: parentDepartmentCode,
-            center_lat: result.center_lat,
-            center_lon: result.center_lon,
-            zoom: 8,
+        if (catalogDept) {
+          const zoneCode = String(catalogDept.zone_id);
+          const zoneDepts = catalog.filter((d) => String(d.zone_id) === zoneCode);
+          const avgLat = zoneDepts.reduce((s, d) => s + d.center_lat, 0) / zoneDepts.length;
+          const avgLon = zoneDepts.reduce((s, d) => s + d.center_lon, 0) / zoneDepts.length;
+          const zone: Jurisdiccion = {
+            id: `zone:${zoneCode}`,
+            layer: 'zonas',
+            name: catalogDept.zone_name ?? `Zona ${zoneCode}`,
+            code: zoneCode,
+            center_lat: avgLat,
+            center_lon: avgLon,
+            zoom: 6.6,
           };
-          navigateTo(fallbackDept);
-          setSelectedMunicipioCode(municipioCode);
+          navigateTo(zone);
+          navigateTo(catalogDept);
+          setSelectedMunicipioCode(municipioCode, result.name);
+          navigate(`${viewPath}/${zoneCode}/${catalogDept.code}/${municipioCode}`);
+        } else {
+          // Fallback: dept not in catalog — navigate by URL, let useRouteSync reconstruct
+          navigate(`${viewPath}/${parentDepartmentCode}`);
         }
       } else if (result.type === "departamento") {
         reset();
-        const jurisdiccion: Jurisdiccion = {
-          id: result.id,
-          layer: "departamentos",
-          name: result.name,
-          code: result.code,
-          parent_code: result.parent_code,
-          center_lat: result.center_lat,
-          center_lon: result.center_lon,
-          zoom: result.zoom,
-        };
-        navigateTo(jurisdiccion);
-        setSelectedMunicipioCode(null);
+        const catalog = await api.getDepartamentosCatalog();
+        const catalogDept = catalog.find((d) => d.code === result.code);
+        if (catalogDept) {
+          const zoneCode = String(catalogDept.zone_id);
+          const zoneDepts = catalog.filter((d) => String(d.zone_id) === zoneCode);
+          const avgLat = zoneDepts.reduce((s, d) => s + d.center_lat, 0) / zoneDepts.length;
+          const avgLon = zoneDepts.reduce((s, d) => s + d.center_lon, 0) / zoneDepts.length;
+          const zone: Jurisdiccion = {
+            id: `zone:${zoneCode}`,
+            layer: 'zonas',
+            name: catalogDept.zone_name ?? `Zona ${zoneCode}`,
+            code: zoneCode,
+            center_lat: avgLat,
+            center_lon: avgLon,
+            zoom: 6.6,
+          };
+          navigateTo(zone);
+          navigateTo(catalogDept);
+          setSelectedMunicipioCode(null);
+          navigate(`${viewPath}/${zoneCode}/${catalogDept.code}`);
+        } else {
+          // Fallback: not in catalog, let useRouteSync reconstruct from URL
+          navigate(`${viewPath}/${result.code}`);
+        }
       }
     } finally {
       setShowResults(false);

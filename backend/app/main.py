@@ -667,7 +667,8 @@ def search(
             results.append(SearchItem(id=j.id, type="jurisdiccion", nombre_completo=j.nombre))
 
     if "geo" in search_types:
-        # Search geographic catalog (CSV-backed) for autocomplete compatibility
+        # Search using DB catalog (canonical codes) for code consistency across the app.
+        # Coordinates are resolved from the geo CSV catalog matched by name.
         try:
             try:
                 from app.data_loader import build_departamentos_catalog, build_municipios_catalog, normalize_text
@@ -675,42 +676,66 @@ def search(
                 from data_loader import build_departamentos_catalog, build_municipios_catalog, normalize_text  # type: ignore
 
             q_norm = normalize_text(effective_query)
-            _, departamentos = build_departamentos_catalog()
-            dept_by_code = {dept.code: dept.name for dept in departamentos}
 
-            for dept in departamentos:
-                dept_name_norm = normalize_text(dept.name)
-                if q_norm in dept_name_norm or dept.code.startswith(q_norm):
-                    results.append(
-                        SearchItem(
-                            id=dept.id,
-                            type="departamento",
-                            nombre_completo=dept.name,
-                            geo_code=dept.code,
-                            center_lat=dept.center_lat,
-                            center_lon=dept.center_lon,
-                            zoom=dept.zoom,
-                        )
-                    )
-                    total += 1
+            # Build geo coordinate lookup by normalized dept name
+            _, geo_depts = build_departamentos_catalog()
+            geo_dept_by_norm_name = {normalize_text(d.name): d for d in geo_depts}
 
-            for mun in build_municipios_catalog():
-                mun_name_norm = normalize_text(mun.name)
-                if q_norm in mun_name_norm or mun.code.startswith(q_norm):
-                    results.append(
-                        SearchItem(
-                            id=mun.id,
-                            type="municipio",
-                            nombre_completo=mun.name,
-                            geo_code=mun.code,
-                            parent_code=mun.parent_code,
-                            parent_name=dept_by_code.get(mun.parent_code or ""),
-                            center_lat=mun.center_lat,
-                            center_lon=mun.center_lon,
-                            zoom=mun.zoom,
-                        )
+            # Build geo coordinate lookup by normalized muni name
+            geo_muni_by_norm_name: dict[str, Any] = {}
+            for m in build_municipios_catalog():
+                key = normalize_text(m.name)
+                if key not in geo_muni_by_norm_name:
+                    geo_muni_by_norm_name[key] = m
+
+            # All dept rows for parent_name lookups
+            all_dept_rows = db.query(TerritorioDepartamentoORM).all()
+            dept_name_by_code = {str(r.codigo).zfill(2): str(r.nombre).strip() for r in all_dept_rows}
+
+            # Search departments in DB (canonical catalog codes)
+            for dept_row in all_dept_rows:
+                dept_name = str(dept_row.nombre).strip()
+                dept_norm = normalize_text(dept_name)
+                dept_code = str(dept_row.codigo).zfill(2)
+                if q_norm not in dept_norm and not dept_code.startswith(q_norm):
+                    continue
+                geo = geo_dept_by_norm_name.get(dept_norm)
+                results.append(
+                    SearchItem(
+                        id=f"dept:{dept_code}",
+                        type="departamento",
+                        nombre_completo=dept_name,
+                        geo_code=dept_code,
+                        center_lat=geo.center_lat if geo else 4.5709,
+                        center_lon=geo.center_lon if geo else -74.2973,
+                        zoom=geo.zoom if geo else 8.2,
                     )
-                    total += 1
+                )
+                total += 1
+
+            # Search municipios in DB (canonical catalog codes)
+            for muni_row in db.query(TerritorioMunicipioORM).all():
+                muni_name = str(muni_row.nombre).strip()
+                muni_norm = normalize_text(muni_name)
+                muni_code = str(muni_row.codigo).zfill(5)
+                if q_norm not in muni_norm and not muni_code.startswith(q_norm):
+                    continue
+                dept_code = str(muni_row.departamento_codigo).zfill(2)
+                geo = geo_muni_by_norm_name.get(muni_norm)
+                results.append(
+                    SearchItem(
+                        id=f"mun:{muni_code}",
+                        type="municipio",
+                        nombre_completo=muni_name,
+                        geo_code=muni_code,
+                        parent_code=dept_code,
+                        parent_name=dept_name_by_code.get(dept_code, dept_code),
+                        center_lat=geo.center_lat if geo else 4.5709,
+                        center_lon=geo.center_lon if geo else -74.2973,
+                        zoom=geo.zoom if geo else 9.0,
+                    )
+                )
+                total += 1
         except Exception:
             pass  # geo catalog optional
 

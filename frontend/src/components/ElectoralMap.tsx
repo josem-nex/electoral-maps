@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   MapContainer,
   GeoJSON,
@@ -295,6 +296,17 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
   }, []);
 
   const loading = loadingCount > 0;
+
+  // React Router navigate — kept in a ref so Leaflet event closures always have latest
+  const navigate = useNavigate();
+  const navigateRef = useRef(navigate);
+  useEffect(() => { navigateRef.current = navigate; }, [navigate]);
+
+  // activeView and selectedYear refs for use inside Leaflet event handlers (stale closures)
+  const activeViewRef = useRef(activeView);
+  const selectedYearRef = useRef(selectedYear);
+  useEffect(() => { activeViewRef.current = activeView; }, [activeView]);
+  useEffect(() => { selectedYearRef.current = selectedYear; }, [selectedYear]);
 
   // Ref to keep selectedMunicipioCode accessible in stale Leaflet closures
   const selectedMunicipioCodeRef = useRef<string | null>(selectedMunicipioCode);
@@ -719,7 +731,14 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
             }
           }
           if (isActive) {
-            setPuestos([]);
+            // Don't clear puestos when a municipio is selected: the puestos
+            // effect (which reacts to selectedMunicipioCode) handles loading
+            // them. Clearing here would cause a race condition where puestos
+            // loaded by that effect get wiped when getMunicipiosGeoJSON resolves.
+            const { selectedMunicipioCode: currentMuniCode } = useNavigationStore.getState();
+            if (!currentMuniCode) {
+              setPuestos([]);
+            }
           }
         } else if (currentJurisdiccion.layer === "municipio") {
           shouldTrackLoading = true;
@@ -1031,6 +1050,12 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
     selectedMunicipioCode,
   ]);
 
+  // Returns the URL base for the current view, e.g. '/puestos' or '/resultados/2026'
+  const getViewUrlBase = () =>
+    activeView === 'resultados'
+      ? `/resultados/${selectedYear}`
+      : `/${activeView}`;
+
   const handleDepartmentClick = (feature: any) => {
     const deptCode = departmentCodeFromFeature(feature);
     const deptName =
@@ -1054,10 +1079,13 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
     }
 
     // Find this department in the loaded data
+    const zoneCode = useNavigationStore.getState().navigationStack
+      .find((j) => j.layer === 'zonas')?.code;
     const dept = departamentos.find((d) => d.code === deptCode);
     if (dept) {
       setSelectedMunicipioCode(null);
       navigateTo(dept);
+      navigate(`${getViewUrlBase()}/${zoneCode ?? dept.zone_id ?? ''}/${dept.code}`);
     } else {
       // Create jurisdiction on the fly
       const sourceFeature = departmentFeatureByCode.get(deptCode) ?? feature;
@@ -1073,6 +1101,7 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
         center_lon: center.lng,
         zoom: 8.0,
       });
+      navigate(`${getViewUrlBase()}/${zoneCode ?? ''}/${deptCode}`);
     }
   };
 
@@ -1114,6 +1143,7 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
       center_lon: center.lng,
       zoom: 6.6,
     });
+    navigate(`${getViewUrlBase()}/${zone.id}`);
   };
 
   const zonePalette = [
@@ -1240,7 +1270,19 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
       click: () => {
         const featureCode = municipalityCodeFromFeature(feature);
         if (featureCode) {
-          setSelectedMunicipioCode(featureCode);
+          const featureName = (featureCode ? municipioNameByCode.get(featureCode) : null)
+            ?? municipalityNameFromFeature(feature)
+            ?? undefined;
+          setSelectedMunicipioCode(featureCode, featureName);
+          const state = useNavigationStore.getState();
+          const deptCode = state.currentJurisdiccion?.code;
+          const zoneCode = state.navigationStack.find((j) => j.layer === 'zonas')?.code;
+          const base = activeViewRef.current === 'resultados'
+            ? `/resultados/${selectedYearRef.current}`
+            : `/${activeViewRef.current}`;
+          if (deptCode && zoneCode) {
+            navigateRef.current(`${base}/${zoneCode}/${deptCode}/${featureCode}`);
+          }
         } else {
           console.error(
             "Territorial integrity error: municipality feature without canonical ID",

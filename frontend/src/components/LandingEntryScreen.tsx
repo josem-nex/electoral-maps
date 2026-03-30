@@ -1,42 +1,27 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import backgroundImage from "../../../data/images/image_fondo_colombia.jpg";
 import companyLogo from "../../../data/images/LOGO FINAL E DAY TECH.png";
 import colombiaFlag from "../../../data/images/image_download.png";
 
 type LandingView = "puestos" | "jurados-testigos" | "resultados";
 
-interface LandingEntryScreenProps {
-  onEnterPuestos: () => void;
-  onEnterJuradosTestigos: () => void;
-  onEnterResultados: (year: number) => void;
-}
-
 const RESULT_YEARS = [2018, 2019, 2022, 2023, 2026] as const;
 
-export function LandingEntryScreen({
-  onEnterPuestos,
-  onEnterJuradosTestigos,
-  onEnterResultados,
-}: LandingEntryScreenProps) {
+export function LandingEntryScreen() {
   const [selectedView, setSelectedView] = useState<LandingView>("puestos");
   const [selectedYear, setSelectedYear] = useState<number>(2026);
-
-  const canEnter =
-    selectedView === "puestos" ||
-    selectedView === "jurados-testigos" ||
-    selectedView === "resultados";
+  const navigate = useNavigate();
 
   const handleContinue = () => {
     if (selectedView === "puestos") {
-      onEnterPuestos();
+      navigate("/puestos");
     } else if (selectedView === "jurados-testigos") {
-      onEnterJuradosTestigos();
+      navigate("/jurados-testigos");
     } else if (selectedView === "resultados") {
-      onEnterResultados(selectedYear);
+      navigate(`/resultados/${selectedYear}`);
     }
   };
-
-  const enterButtonLabel = () => "Entrar";
 
   return (
     <div className="min-h-screen w-screen bg-slate-50">
@@ -155,14 +140,9 @@ export function LandingEntryScreen({
           <button
             type="button"
             onClick={handleContinue}
-            disabled={!canEnter}
-            className={`rounded-xl px-14 py-6 text-2xl font-semibold transition ${
-              canEnter
-                ? "bg-blue-700 text-white hover:bg-blue-800"
-                : "cursor-not-allowed bg-slate-300 text-slate-600"
-            }`}
+            className="rounded-xl bg-blue-700 px-14 py-6 text-2xl font-semibold text-white transition hover:bg-blue-800"
           >
-            {enterButtonLabel()}
+            Entrar
           </button>
         </div>
       </main>

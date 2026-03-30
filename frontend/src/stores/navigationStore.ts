@@ -21,11 +21,12 @@ interface NavigationStore {
   currentJurisdiccion: Jurisdiccion | null;
   navigationStack: Jurisdiccion[];
   selectedMunicipioCode: string | null;
+  selectedMunicipioName: string | null;
 
   navigateTo: (jurisdiccion: Jurisdiccion) => void;
   navigateBack: () => void;
   navigateToIndex: (index: number) => void;
-  setSelectedMunicipioCode: (code: string | null) => void;
+  setSelectedMunicipioCode: (code: string | null, name?: string | null) => void;
   reset: () => void;
 }
 
@@ -44,6 +45,7 @@ export const useNavigationStore = create<NavigationStore>((set) => ({
   currentJurisdiccion: initialJurisdiccion,
   navigationStack: [initialJurisdiccion],
   selectedMunicipioCode: null,
+  selectedMunicipioName: null,
 
   navigateTo: (jurisdiccion) => set((state) => {
     const current = state.currentJurisdiccion;
@@ -59,8 +61,8 @@ export const useNavigationStore = create<NavigationStore>((set) => ({
         currentLayer: jurisdiccion.layer,
         currentJurisdiccion: jurisdiccion,
         navigationStack: updatedStack,
-        // Clear so SearchBar's setSelectedMunicipioCode always triggers a fresh change
         selectedMunicipioCode: null,
+        selectedMunicipioName: null,
       };
     }
 
@@ -69,6 +71,7 @@ export const useNavigationStore = create<NavigationStore>((set) => ({
       currentJurisdiccion: jurisdiccion,
       navigationStack: [...state.navigationStack, jurisdiccion],
       selectedMunicipioCode: null,
+      selectedMunicipioName: null,
     };
   }),
 
@@ -81,6 +84,7 @@ export const useNavigationStore = create<NavigationStore>((set) => ({
       currentLayer: previous.layer,
       currentJurisdiccion: previous,
       selectedMunicipioCode: null,
+      selectedMunicipioName: null,
     };
   }),
 
@@ -93,13 +97,14 @@ export const useNavigationStore = create<NavigationStore>((set) => ({
       currentLayer: target.layer,
       currentJurisdiccion: target,
       selectedMunicipioCode: null,
+      selectedMunicipioName: null,
     };
   }),
 
-  setSelectedMunicipioCode: (code) =>
+  setSelectedMunicipioCode: (code, name) =>
     set({
-      selectedMunicipioCode:
-        code === null ? null : normalizeMunicipioCode(code),
+      selectedMunicipioCode: code === null ? null : normalizeMunicipioCode(code),
+      selectedMunicipioName: code === null ? null : (name ?? null),
     }),
 
   reset: () => set({
@@ -107,5 +112,6 @@ export const useNavigationStore = create<NavigationStore>((set) => ({
     currentJurisdiccion: initialJurisdiccion,
     navigationStack: [initialJurisdiccion],
     selectedMunicipioCode: null,
+    selectedMunicipioName: null,
   }),
 }));
