@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "../api/client";
 import type { SearchResult } from "../api/client";
@@ -22,6 +22,16 @@ export function SearchBar() {
   const viewPath = segments[0] === 'resultados'
     ? `/${segments[0]}/${segments[1] ?? ''}`
     : `/${segments[0] ?? ''}`;
+
+  // Disable map interactions (pointer-events + tooltips) while dropdown is open
+  useEffect(() => {
+    if (showResults) {
+      document.body.classList.add('search-active');
+    } else {
+      document.body.classList.remove('search-active');
+    }
+    return () => document.body.classList.remove('search-active');
+  }, [showResults]);
 
   const handleSearch = async (searchQuery: string) => {
     setQuery(searchQuery);
@@ -83,7 +93,9 @@ export function SearchBar() {
           setSelectedMunicipioCode(municipioCode, result.name);
           navigate(`${viewPath}/${zoneCode}/${catalogDept.code}/${municipioCode}`);
         } else {
-          // Fallback: dept not in catalog — navigate by URL, let useRouteSync reconstruct
+          // Fallback: dept not in catalog — navigate by URL only; Zustand update is
+          // intentionally omitted here because useRouteSync will reconstruct the full
+          // navigationStack (zone + dept + muni) on the next render from the new URL.
           navigate(`${viewPath}/${parentDepartmentCode}`);
         }
       } else if (result.type === "departamento") {
@@ -127,11 +139,11 @@ export function SearchBar() {
         onChange={(e) => handleSearch(e.target.value)}
         onFocus={() => setShowResults(query.trim().length > 0)}
         placeholder="Buscar departamento o municipio..."
-        className="h-14 w-full rounded-lg border border-blue-200 bg-white px-5 pr-12 text-lg text-slate-900 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
+        className="h-9 w-full rounded-lg border border-gray-200 bg-white px-4 pr-10 text-sm text-slate-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all duration-200"
       />
       {!isSearching && (
         <svg
-          className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500"
+          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -145,38 +157,46 @@ export function SearchBar() {
         </svg>
       )}
       {isSearching && (
-        <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2">
+        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
           <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
         </div>
       )}
 
       {showResults && results.length > 0 && (
-        <div className="absolute z-20 mt-2 max-h-96 w-full overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-xl">
-          {results.map((result) => (
-            <button
-              key={result.id}
-              onClick={() => handleResultClick(result)}
-              className="w-full border-b border-gray-100 px-5 py-4 text-left transition-colors last:border-b-0 hover:bg-gray-100"
-            >
-              <div className="text-lg font-semibold text-gray-900">
-                {result.name}
-              </div>
-              <div className="mt-1 text-base text-gray-600">
-                {result.type === "departamento" && "Departamento"}
-                {result.type === "municipio" &&
-                  `Municipio${result.parent_name ? ` • ${result.parent_name}` : ""}`}
-                {result.direccion && ` • ${result.direccion}`}
-              </div>
-            </button>
-          ))}
-        </div>
+        <>
+          {/* Transparent overlay — blocks map clicks/touches while dropdown is open */}
+          <div
+            className="fixed inset-0 z-[9998]"
+            onClick={() => { setShowResults(false); setQuery(""); }}
+            onTouchStart={() => { setShowResults(false); setQuery(""); }}
+          />
+          <div className="absolute z-[9999] mt-2 max-h-96 w-full overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-xl">
+            {results.map((result) => (
+              <button
+                key={result.id}
+                onClick={() => handleResultClick(result)}
+                className="w-full border-b border-gray-100 bg-white px-5 py-4 text-left transition-all duration-200 last:border-b-0 hover:bg-gray-100"
+              >
+                <div className="text-lg font-semibold text-gray-900">
+                  {result.name}
+                </div>
+                <div className="mt-1 text-base text-gray-600">
+                  {result.type === "departamento" && "Departamento"}
+                  {result.type === "municipio" &&
+                    `Municipio${result.parent_name ? ` • ${result.parent_name}` : ""}`}
+                  {result.direccion && ` • ${result.direccion}`}
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {showResults &&
         results.length === 0 &&
         query.trim().length >= 1 &&
         !isSearching && (
-          <div className="absolute z-20 mt-2 w-full rounded-lg border border-gray-300 bg-white p-5 text-center text-lg text-gray-500 shadow-xl">
+          <div className="absolute z-[9999] mt-2 w-full rounded-lg border border-gray-300 bg-white p-5 text-center text-lg text-gray-500 shadow-xl">
             No se encontraron resultados
           </div>
         )}

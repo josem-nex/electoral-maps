@@ -1,7 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
 import { useNavigationStore } from "../stores/navigationStore";
 
-export function Breadcrumbs() {
+interface BreadcrumbsProps {
+  dark?: boolean;
+}
+
+export function Breadcrumbs({ dark = false }: BreadcrumbsProps) {
   const {
     navigationStack,
     navigateToIndex,
@@ -10,6 +14,14 @@ export function Breadcrumbs() {
     setSelectedMunicipioCode,
   } = useNavigationStore();
   const location = useLocation();
+
+  if (navigationStack.length === 0) return null;
+
+  const separatorClass = dark ? 'text-white/30' : 'text-gray-300';
+  const leafClass = dark ? 'font-semibold text-white' : 'font-semibold text-gray-900';
+  const linkClass = dark
+    ? 'text-white/60 transition-colors duration-200 hover:text-white hover:underline'
+    : 'text-gray-500 transition-colors duration-200 hover:text-gray-900 hover:underline';
 
   // Derive the view prefix (e.g. '/puestos', '/resultados/2026')
   const segments = location.pathname.split('/').filter(Boolean);
@@ -34,58 +46,52 @@ export function Breadcrumbs() {
     !!selectedMunicipioCode &&
     navigationStack[navigationStack.length - 1]?.layer === 'departamentos';
 
-  // When municipality is selected, the dept is no longer the "current leaf" —
-  // it should be clickable to go back to dept view.
   const isCurrentLeaf = (index: number) =>
     index === navigationStack.length - 1 && !hasMuniSelected;
 
   const handleDeptClickWithMuni = () => {
-    // Clear municipality selection to return to dept view
     setSelectedMunicipioCode(null);
   };
 
   return (
-    <div className="mx-2 rounded-b-md border-x border-b bg-white px-5 py-3.5">
-      <div className="flex items-center space-x-2 text-lg">
-        {navigationStack.map((jurisdiccion, index) => (
-          <div key={jurisdiccion.id} className="flex items-center">
-            {index > 0 && <span className="mx-2 text-xl text-gray-400">/</span>}
-            {isCurrentLeaf(index) ? (
-              <span className="text-lg font-semibold text-blue-600">
-                {jurisdiccion.name}
-              </span>
-            ) : (
-              <Link
-                to={buildHref(index)}
-                onClick={() => {
-                  // If clicking dept while muni is selected, just clear the muni
-                  if (
-                    hasMuniSelected &&
-                    index === navigationStack.length - 1
-                  ) {
-                    handleDeptClickWithMuni();
-                  } else {
-                    navigateToIndex(index);
-                  }
-                }}
-                className="text-lg text-gray-600 transition-colors hover:text-blue-600 hover:underline"
-              >
-                {jurisdiccion.name}
-              </Link>
-            )}
-          </div>
-        ))}
-
-        {/* Municipality as the current (non-clickable) leaf */}
-        {hasMuniSelected && (
-          <div className="flex items-center">
-            <span className="mx-2 text-xl text-gray-400">/</span>
-            <span className="text-lg font-semibold text-blue-600">
-              {selectedMunicipioName ?? selectedMunicipioCode}
+    <div className="mt-1.5 flex items-center gap-1 text-sm">
+      {navigationStack.map((jurisdiccion, index) => (
+        <div key={jurisdiccion.id} className="flex items-center gap-1">
+          {index > 0 && <span className={`${separatorClass} select-none`}>›</span>}
+          {isCurrentLeaf(index) ? (
+            <span className={leafClass}>
+              {jurisdiccion.name}
             </span>
-          </div>
-        )}
-      </div>
+          ) : (
+            <Link
+              to={buildHref(index)}
+              onClick={() => {
+                if (
+                  hasMuniSelected &&
+                  index === navigationStack.length - 1
+                ) {
+                  handleDeptClickWithMuni();
+                } else {
+                  navigateToIndex(index);
+                }
+              }}
+              className={linkClass}
+            >
+              {jurisdiccion.name}
+            </Link>
+          )}
+        </div>
+      ))}
+
+      {/* Municipality as the current (non-clickable) leaf */}
+      {hasMuniSelected && (
+        <div className="flex items-center gap-1">
+          <span className={`${separatorClass} select-none`}>›</span>
+          <span className={leafClass}>
+            {selectedMunicipioName ?? selectedMunicipioCode}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

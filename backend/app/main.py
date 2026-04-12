@@ -1295,6 +1295,21 @@ def get_personal_conteos(
     if nivel not in valid_niveles:
         raise HTTPException(status_code=422, detail=f"nivel debe ser uno de: {sorted(valid_niveles)}")
 
+    # Validate that the requested territory code actually exists so the endpoint
+    # fails loudly with 404 instead of silently returning zeros for unknown codes.
+    if nivel == "zona":
+        exists = db.query(TerritorioZonaORM.codigo).filter(TerritorioZonaORM.codigo == codigo).first()
+        if not exists:
+            raise HTTPException(status_code=404, detail=f"Zona no encontrada: '{codigo}'")
+    elif nivel == "departamento":
+        exists = db.query(TerritorioDepartamentoORM.codigo).filter(TerritorioDepartamentoORM.codigo == codigo).first()
+        if not exists:
+            raise HTTPException(status_code=404, detail=f"Departamento no encontrado: '{codigo}'")
+    elif nivel == "municipio":
+        exists = db.query(TerritorioMunicipioORM.codigo).filter(TerritorioMunicipioORM.codigo == codigo).first()
+        if not exists:
+            raise HTTPException(status_code=404, detail=f"Municipio no encontrado: '{codigo}'")
+
     def count_tipo(tipo: str) -> int:
         q = db.query(func.count(PersonalElectoralORM.id)).filter(PersonalElectoralORM.tipo == tipo)
         if nivel == "pais":

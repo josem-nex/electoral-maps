@@ -70,7 +70,7 @@ export function MapInfoRail({
 
   if (activeView === 'resultados') {
     return (
-      <div className="contents lg:block lg:h-full lg:min-h-0">
+      <div className="contents lg:block lg:h-full lg:min-h-0 lg:overflow-y-auto lg:shadow-[-2px_0_8px_rgba(0,0,0,0.04)]">
         <ResultadosElectoralesPanel
           currentJurisdiccion={currentJurisdiccion}
           selectedPuesto={selectedPuesto}
@@ -82,7 +82,7 @@ export function MapInfoRail({
 
   if (activeView === 'jurados-testigos') {
     return (
-      <div className="contents lg:block lg:h-full lg:min-h-0">
+      <div className="contents lg:block lg:h-full lg:min-h-0 lg:overflow-y-auto lg:shadow-[-2px_0_8px_rgba(0,0,0,0.04)]">
         <JuradosTestigosPanel
           currentJurisdiccion={currentJurisdiccion}
           selectedPuesto={selectedPuesto}
@@ -92,7 +92,7 @@ export function MapInfoRail({
   }
 
   return (
-    <div className="contents lg:block lg:h-full lg:min-h-0">
+    <div className="contents lg:block lg:h-full lg:min-h-0 lg:overflow-y-auto lg:shadow-[-2px_0_8px_rgba(0,0,0,0.04)]">
       {selectedPuesto ? (
         <PuestoDetailPanel
           puesto={selectedPuesto}

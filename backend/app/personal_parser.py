@@ -154,7 +154,12 @@ def parse_personal_file(
 
     result = ParseResult(tipo=tipo)
 
-    # Detect if file has a direct CODIGO column
+    # Direct-code path (not part of the public spec): if the file has a column
+    # named "CODIGO", its value is used as codigo_puesto directly instead of
+    # resolving by DEPARTAMENTO + MUNICIPIO + PUESTO name. This was added to
+    # support internal exports that already carry the canonical code, bypassing
+    # the name-resolution step. The spec only requires the name-resolution path;
+    # do not remove this without checking that no active exports rely on it.
     has_codigo_col = "CODIGO" in cols_norm
 
     # Build lookup tables once

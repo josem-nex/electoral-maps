@@ -47,18 +47,21 @@ export function PuestoDetailPanel({
         }
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0">
-          <h3 className="font-bold text-lg text-gray-800">
-            Detalle del Puesto
-          </h3>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-white flex-shrink-0">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Puesto seleccionado</p>
+            <h3 className="mt-0.5 font-semibold text-lg text-gray-900">
+              Detalle del Puesto
+            </h3>
+          </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-full hover:bg-gray-200 transition-colors"
+            className="text-gray-400 transition-all duration-200 hover:text-gray-700"
             aria-label="Cerrar panel"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-6 text-gray-600"
+              className="h-5 w-5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -74,13 +77,13 @@ export function PuestoDetailPanel({
         </div>
 
         {/* Contenido con scroll */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
           {/* Nombre del puesto */}
           <section>
             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
               Nombre del Puesto
             </h4>
-            <p className="text-base font-medium text-gray-900">
+            <p className="text-lg font-semibold text-gray-900">
               {puesto.puesto}
             </p>
           </section>
@@ -90,7 +93,7 @@ export function PuestoDetailPanel({
             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
               Código
             </h4>
-            <p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded inline-block">
+            <p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded inline-block text-gray-700">
               {puesto.codigo_puesto}
             </p>
           </section>
@@ -189,44 +192,44 @@ export function PuestoDetailPanel({
             </h4>
             <div className="grid grid-cols-2 gap-3">
               {puesto.mesas !== null && puesto.mesas !== undefined && (
-                <div className="bg-blue-50 rounded-lg p-3">
-                  <div className="text-xs text-blue-600 font-medium mb-1">
+                <div className="bg-brand-50 rounded-xl p-3 border border-brand-100">
+                  <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">
                     Mesas
                   </div>
-                  <div className="text-xl font-bold text-blue-900">
+                  <div className="text-xl font-bold text-brand-700">
                     {puesto.mesas}
                   </div>
                 </div>
               )}
 
               {puesto.total !== null && puesto.total !== undefined && (
-                <div className="bg-green-50 rounded-lg p-3">
-                  <div className="text-xs text-green-600 font-medium mb-1">
+                <div className="bg-green-50 rounded-xl p-3 border border-green-100">
+                  <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">
                     Potencial Total
                   </div>
-                  <div className="text-xl font-bold text-green-900">
+                  <div className="text-xl font-bold text-green-700">
                     {puesto.total.toLocaleString()}
                   </div>
                 </div>
               )}
 
               {puesto.mujeres !== null && puesto.mujeres !== undefined && (
-                <div className="bg-purple-50 rounded-lg p-3">
-                  <div className="text-xs text-purple-600 font-medium mb-1">
+                <div className="bg-pink-50 rounded-xl p-3 border border-pink-100">
+                  <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">
                     Mujeres
                   </div>
-                  <div className="text-lg font-semibold text-purple-900">
+                  <div className="text-lg font-semibold text-pink-700">
                     {puesto.mujeres.toLocaleString()}
                   </div>
                 </div>
               )}
 
               {puesto.hombres !== null && puesto.hombres !== undefined && (
-                <div className="bg-indigo-50 rounded-lg p-3">
-                  <div className="text-xs text-indigo-600 font-medium mb-1">
+                <div className="bg-sky-50 rounded-xl p-3 border border-sky-100">
+                  <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">
                     Hombres
                   </div>
-                  <div className="text-lg font-semibold text-indigo-900">
+                  <div className="text-lg font-semibold text-sky-700">
                     {puesto.hombres.toLocaleString()}
                   </div>
                 </div>
@@ -284,10 +287,10 @@ export function PuestoDetailPanel({
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+        <div className="px-5 py-4 border-t border-gray-100 bg-white flex-shrink-0">
           <button
             onClick={onClose}
-            className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors font-medium text-sm"
+            className="w-full px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-gray-50 hover:text-gray-900"
           >
             Cerrar
           </button>

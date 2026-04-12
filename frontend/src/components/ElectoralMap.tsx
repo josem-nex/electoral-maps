@@ -1516,7 +1516,7 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
           </MapContainer>
         </section>
 
-        <div ref={panelRef} className="min-h-0 lg:pr-4 xl:pr-6">
+        <div ref={panelRef} className="min-h-0 lg:pl-2 lg:pr-4 xl:pr-6">
           <MapInfoRail
             currentJurisdiccion={currentJurisdiccion}
             activeView={activeView}

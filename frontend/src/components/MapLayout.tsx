@@ -3,6 +3,7 @@ import { Breadcrumbs } from './Breadcrumbs';
 import { SearchBar } from './SearchBar';
 import { useNavigationStore } from '../stores/navigationStore';
 import { useRouteSync } from '../hooks/useRouteSync';
+import companyLogo from '../../../data/images/LOGO FINAL E DAY TECH.png';
 
 export function MapLayout() {
   useRouteSync();
@@ -23,14 +24,20 @@ export function MapLayout() {
   return (
     <div className="h-screen w-screen flex flex-col lg:overflow-hidden">
       {/* Header */}
-      <header className="z-10 bg-blue-600 text-white">
-        <div className="px-4 py-5">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-3xl font-bold">Mapas Electorales Colombia</h1>
-            <div className="flex items-center gap-2">
+      <header className="relative z-50 bg-slate-900 shadow-md flex items-stretch">
+        {/* Left side: search + nav + breadcrumbs */}
+        <div className="flex flex-1 flex-col justify-center px-4 py-2 min-w-0">
+          <div className="flex items-center gap-3">
+            {/* Search bar — fills half the viewport on large screens (mirrors map width) */}
+            <div className="flex-1 lg:max-w-[50vw]">
+              <SearchBar />
+            </div>
+
+            {/* Navigation buttons */}
+            <div className="flex items-center gap-2 ml-auto flex-shrink-0">
               <button
                 onClick={handleGoHome}
-                className="flex items-center gap-2 rounded-lg bg-blue-800 px-5 py-2.5 text-base transition-colors hover:bg-blue-900"
+                className="flex items-center gap-1.5 rounded-lg bg-blue-700 px-6 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-blue-600 active:bg-blue-800"
                 title="Regresar al inicio"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -42,7 +49,7 @@ export function MapLayout() {
               {navigationStack.length > 1 && (
                 <button
                   onClick={handleBack}
-                  className="flex items-center gap-2 rounded-lg bg-blue-700 px-5 py-2.5 text-base transition-colors hover:bg-blue-800"
+                  className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white/70 transition-all duration-200 hover:bg-white/10 hover:text-white"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -52,14 +59,20 @@ export function MapLayout() {
               )}
             </div>
           </div>
-          <div className="max-w-3xl">
-            <SearchBar />
-          </div>
+
+          {/* Breadcrumbs as second line */}
+          <Breadcrumbs dark />
+        </div>
+
+        {/* Right side: Logo — fills full header height */}
+        <div className="flex-shrink-0 flex items-center border-l border-white/10 bg-slate-800 px-4 sm:px-5">
+          <img
+            src={companyLogo}
+            alt="E-Day Tech"
+            className="h-10 w-auto sm:h-12"
+          />
         </div>
       </header>
-
-      {/* Breadcrumbs */}
-      <Breadcrumbs />
 
       {/* Main content (ElectoralMap via Outlet) */}
       <main className="relative flex-1 lg:min-h-0 bg-white">

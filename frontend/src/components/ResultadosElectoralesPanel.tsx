@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { SkeletonLoader } from './SkeletonLoader';
 import type { PuestoElectoral, ResultadosElectorales } from '../api/client';
 import { api } from '../api/client';
 import type { Jurisdiccion } from '../stores/navigationStore';
@@ -189,7 +190,7 @@ export function ResultadosElectoralesPanel({
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       {/* Header */}
-      <div className="border-b border-slate-200 px-5 py-4">
+      <div className="border-b border-slate-200 px-8 py-4">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
           Resultados Electorales {selectedYear}
         </p>
@@ -200,18 +201,19 @@ export function ResultadosElectoralesPanel({
           <p className="mt-0.5 text-xs text-slate-500 font-mono">{resolved.nivelCodigo}</p>
         )}
 
-        {/* Tabs de tipo de elección */}
-        <div className="mt-3 flex rounded-lg border border-slate-200 overflow-hidden text-sm font-semibold">
+        {/* Tabs de tipo de elección — segmented control */}
+        <div className="mt-3 flex rounded-lg border border-slate-200 overflow-hidden text-xs font-semibold">
           {availableTabs.map((tab, i) => (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2 transition ${i > 0 ? 'border-l border-slate-200' : ''} ${
+              className={`flex-1 py-2.5 transition-all duration-200 ${i > 0 ? 'border-l border-slate-200' : ''} ${
                 activeTab === tab
-                  ? 'bg-blue-600 text-white'
+                  ? 'text-white'
                   : 'bg-white text-slate-600 hover:bg-slate-50'
               }`}
+              style={activeTab === tab ? { backgroundColor: '#1e40af' } : {}}
             >
               {TAB_LABELS[tab]}
             </button>
@@ -258,14 +260,7 @@ export function ResultadosElectoralesPanel({
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-        {loading && (
-          <div className="space-y-3 animate-pulse">
-            <div className="h-4 rounded bg-slate-200 w-3/4" />
-            <div className="h-4 rounded bg-slate-200 w-1/2" />
-            <div className="h-4 rounded bg-slate-200 w-2/3" />
-            <div className="h-4 rounded bg-slate-200 w-3/5" />
-          </div>
-        )}
+        {loading && <SkeletonLoader />}
 
         {error && !loading && (
           <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
@@ -275,38 +270,38 @@ export function ResultadosElectoralesPanel({
 
         {data && !loading && (
           <>
-            {/* Totals */}
-            <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 space-y-1.5 text-sm">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Total votos</span>
-                <span className="font-semibold text-slate-900">{formatNum(data.votos_total)}</span>
+            {/* Totals as badges */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-brand-50 px-3 py-2.5">
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Total votos</p>
+                <p className="mt-0.5 text-base font-bold text-brand-700">{formatNum(data.votos_total)}</p>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Votos válidos</span>
-                <span className="font-semibold text-slate-900">
+              <div className="rounded-xl bg-green-50 px-3 py-2.5">
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Válidos</p>
+                <p className="mt-0.5 text-base font-bold text-green-700">
                   {formatNum(data.votos_validos)}
-                  <span className="ml-1 text-slate-400 font-normal">
+                  <span className="ml-1 text-xs font-normal text-green-500">
                     ({pct(data.votos_validos, data.votos_total)})
                   </span>
-                </span>
+                </p>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Votos nulos</span>
-                <span className="font-semibold text-slate-900">
+              <div className="rounded-xl bg-red-50 px-3 py-2.5">
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Nulos</p>
+                <p className="mt-0.5 text-base font-bold text-red-600">
                   {formatNum(data.votos_nulos)}
-                  <span className="ml-1 text-slate-400 font-normal">
+                  <span className="ml-1 text-xs font-normal text-red-400">
                     ({pct(data.votos_nulos, data.votos_total)})
                   </span>
-                </span>
+                </p>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Votos en blanco</span>
-                <span className="font-semibold text-slate-900">
+              <div className="rounded-xl bg-slate-50 px-3 py-2.5">
+                <p className="text-xs text-gray-500 uppercase tracking-wide">En blanco</p>
+                <p className="mt-0.5 text-base font-bold text-slate-700">
                   {formatNum(data.votos_blancos)}
-                  <span className="ml-1 text-slate-400 font-normal">
+                  <span className="ml-1 text-xs font-normal text-slate-400">
                     ({pct(data.votos_blancos, data.votos_total)})
                   </span>
-                </span>
+                </p>
               </div>
             </div>
 
@@ -316,46 +311,54 @@ export function ResultadosElectoralesPanel({
                 Distribución por partido
               </p>
               <div className="space-y-3">
-                {data.partidos.map((partido) => (
-                  <div key={partido.partido_codigo} className="space-y-1">
-                    <div className="flex items-center justify-between gap-2 text-sm">
-                      <span
-                        className="font-medium text-slate-800 leading-tight flex-1 min-w-0 truncate"
-                        title={partido.partido_nombre}
-                      >
-                        {partido.partido_nombre}
-                      </span>
-                      <span className="shrink-0 font-semibold text-slate-900">
-                        {partido.pct_partido}%
-                      </span>
-                    </div>
-                    <div className="h-1.5 w-full rounded-full bg-slate-100">
-                      <div
-                        className="h-1.5 rounded-full bg-blue-500"
-                        style={{ width: `${Math.min(partido.pct_partido, 100)}%` }}
-                      />
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      {formatNum(partido.partido_votos)} votos
-                    </div>
-
-                    {/* Top 5 candidatos */}
-                    {partido.top5_candidatos.length > 0 && (
-                      <div className="ml-3 mt-1 space-y-0.5">
-                        {partido.top5_candidatos.map((cand) => (
-                          <div key={cand.codigo} className="flex items-center justify-between text-xs text-slate-600">
-                            <span className="truncate flex-1 min-w-0" title={cand.nombre}>
-                              {cand.nombre}
-                            </span>
-                            <span className="shrink-0 ml-2 font-medium text-slate-700">
-                              {formatNum(cand.votos)}
-                            </span>
-                          </div>
-                        ))}
+                {data.partidos.map((partido, idx) => {
+                  // Gradient of blues: cycle through a palette
+                  const barColors = [
+                    'bg-blue-600', 'bg-brand-700', 'bg-sky-500', 'bg-indigo-500',
+                    'bg-blue-400', 'bg-cyan-500', 'bg-violet-500', 'bg-teal-500',
+                  ];
+                  const barColor = barColors[idx % barColors.length];
+                  return (
+                    <div key={partido.partido_codigo} className="space-y-1">
+                      <div className="flex items-center justify-between gap-2 text-sm">
+                        <span
+                          className="font-medium text-slate-800 leading-tight flex-1 min-w-0 truncate"
+                          title={partido.partido_nombre}
+                        >
+                          {partido.partido_nombre}
+                        </span>
+                        <span className="shrink-0 font-bold text-brand-700">
+                          {partido.pct_partido}%
+                        </span>
                       </div>
-                    )}
-                  </div>
-                ))}
+                      <div className="h-2 w-full rounded-full bg-slate-100">
+                        <div
+                          className={`h-2 rounded-full transition-all duration-300 ${barColor}`}
+                          style={{ width: `${Math.min(partido.pct_partido, 100)}%` }}
+                        />
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {formatNum(partido.partido_votos)} votos
+                      </div>
+
+                      {/* Top 5 candidatos */}
+                      {partido.top5_candidatos.length > 0 && (
+                        <div className="ml-3 mt-1 space-y-0.5">
+                          {partido.top5_candidatos.map((cand) => (
+                            <div key={cand.codigo} className="flex items-center justify-between text-xs text-slate-600">
+                              <span className="truncate flex-1 min-w-0" title={cand.nombre}>
+                                {cand.nombre}
+                              </span>
+                              <span className="shrink-0 ml-2 font-medium text-slate-700">
+                                {formatNum(cand.votos)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </>
