@@ -404,9 +404,9 @@ def run_ingesta(anio: int, csv_path: Path, engine, *,
             if col in chunk.columns:
                 chunk[col] = chunk[col].astype(str).str.strip()
 
-        # Filtrar por corporación cuando se provee --corp con formato territoriales.
-        # Esto permite procesar una corporación a la vez, reduciendo memoria y CPU.
-        if formato == "territoriales" and corp_codigo and "CORCODIGO" in chunk.columns:
+        # Filtrar por corporación cuando se provee --corp y el CSV tiene columna CORCODIGO.
+        # Aplica a todos los formatos (2022, 2026, territoriales).
+        if corp_codigo and "CORCODIGO" in chunk.columns:
             chunk = chunk[chunk["CORCODIGO"] == corp_codigo]
 
         # Drop total-mesa rows (detect via classify_can to handle all formats)
