@@ -24,7 +24,7 @@ interface UploadModalProps {
   onSuccess: (res: CargaResponse) => void;
 }
 
-function UploadModal({ estado, onClose, onSuccess }: UploadModalProps) {
+export function UploadModal({ estado, onClose, onSuccess }: UploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [tipoOverride, setTipoOverride] = useState<'jurado' | 'testigo' | ''>('');
   const [stage, setStage] = useState<'select' | 'confirm' | 'loading' | 'result'>('select');
@@ -211,7 +211,7 @@ interface DeleteModalProps {
   onSuccess: () => void;
 }
 
-function DeleteModal({ onClose, onSuccess }: DeleteModalProps) {
+export function DeleteModal({ onClose, onSuccess }: DeleteModalProps) {
   const [tipo, setTipo] = useState<'jurado' | 'testigo' | 'todos'>('todos');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

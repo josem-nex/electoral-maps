@@ -1,36 +1,31 @@
-import { Routes, Route, Navigate, useParams } from 'react-router-dom';
-import { ElectoralMap } from './components/ElectoralMap';
-import { LandingEntryScreen } from './components/LandingEntryScreen';
-import { MapLayout } from './components/MapLayout';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AppShell } from './components/shell/AppShell';
+import { TabRouter } from './components/views/TabRouter';
+import { PuestoModal } from './components/views/PuestoModal';
+import { useEleccionUrlSync } from './hooks/useEleccionUrlSync';
+import { useRouteSync } from './hooks/useRouteSync';
 
 export type ActiveView = 'puestos' | 'resultados' | 'jurados-testigos';
 
-function PuestosPage() {
-  return <ElectoralMap activeView="puestos" />;
-}
-
-function JuradosPage() {
-  return <ElectoralMap activeView="jurados-testigos" />;
-}
-
-function ResultadosPage() {
-  const { year } = useParams<{ year: string }>();
-  return <ElectoralMap activeView="resultados" selectedYear={Number(year) || 2026} />;
+function ShellLayout() {
+  useEleccionUrlSync();
+  useRouteSync();
+  return (
+    <AppShell>
+      <TabRouter />
+      <PuestoModal />
+    </AppShell>
+  );
 }
 
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<LandingEntryScreen />} />
-
-      <Route element={<MapLayout />}>
-        {/* Single wildcard per view prevents ElectoralMap from remounting on depth change */}
-        <Route path="/puestos/*" element={<PuestosPage />} />
-        <Route path="/resultados/:year/*" element={<ResultadosPage />} />
-        <Route path="/jurados-testigos/*" element={<JuradosPage />} />
-      </Route>
-
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/" element={<Navigate to="/resultados/2022" replace />} />
+      <Route path="/puestos/*" element={<ShellLayout />} />
+      <Route path="/resultados/:year/*" element={<ShellLayout />} />
+      <Route path="/jurados-testigos/*" element={<ShellLayout />} />
+      <Route path="*" element={<Navigate to="/resultados/2022" replace />} />
     </Routes>
   );
 }

@@ -11,6 +11,7 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useNavigationStore } from "../stores/navigationStore";
+import { usePuestoModalStore } from "../stores/puestoModalStore";
 import { api } from "../api/client";
 import type { PuestoElectoral, TerritorioStats } from "../api/client";
 import type { Jurisdiccion } from "../stores/navigationStore";
@@ -1350,9 +1351,9 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
   };
 
   return (
-    <div className="h-full w-full bg-white lg:p-4">
-      <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-2 lg:gap-4">
-        <section className="relative min-h-[55vh] overflow-hidden bg-white lg:min-h-0 lg:rounded-2xl lg:border lg:border-slate-200 lg:shadow-sm">
+    <div className="h-full w-full bg-white">
+      <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-2">
+        <section className="relative min-h-[55vh] overflow-hidden bg-white lg:min-h-0">
           <div className="absolute right-20 top-2.5 z-[1000]">
             {!isConsuladosDepartmentView ? (
               <button
@@ -1509,6 +1510,13 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
                         Potencial: {puesto.total.toLocaleString()}
                       </div>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => usePuestoModalStore.getState().open(puesto)}
+                      className="mt-2 inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-700"
+                    >
+                      Ver detalle
+                    </button>
                   </div>
                 </Popup>
               </Marker>
@@ -1516,7 +1524,7 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
           </MapContainer>
         </section>
 
-        <div ref={panelRef} className="min-h-0 lg:pl-2 lg:pr-4 xl:pr-6">
+        <div ref={panelRef} className="min-h-0 overflow-auto border-l border-[var(--civ-border)] p-3 lg:p-4">
           <MapInfoRail
             currentJurisdiccion={currentJurisdiccion}
             activeView={activeView}

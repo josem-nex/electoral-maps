@@ -1,5 +1,22 @@
 @import "tailwindcss";
 
+:root {
+  --civ-bg: #f4f6fb;
+  --civ-surface: #ffffff;
+  --civ-border: #e4e8f0;
+  --civ-border-strong: #cbd3e0;
+  --civ-text: #0f172a;
+  --civ-text-muted: #64748b;
+  --civ-text-soft: #94a3b8;
+  --civ-primary: #1D4E89;
+  --civ-primary-soft: #e8eef6;
+  --civ-primary-hover: #163d6d;
+  --civ-shadow-sm: 0 1px 2px rgba(15,23,42,0.04);
+  --civ-shadow-md: 0 4px 16px rgba(15,23,42,0.06);
+  --civ-radius: 10px;
+  --civ-radius-lg: 14px;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -8,6 +25,24 @@
 
 body {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--civ-bg);
+}
+
+/* Civica utility classes — match design tokens */
+.civ-card {
+  background: var(--civ-surface);
+  border: 1px solid var(--civ-border);
+  border-radius: var(--civ-radius-lg);
+  box-shadow: var(--civ-shadow-sm);
+}
+.civ-card-pad { padding: 16px; }
+.civ-eyebrow {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--civ-text-soft);
+}
+.civ-card-title {
+  font-size: 16px; font-weight: 600; letter-spacing: -0.01em;
+  color: var(--civ-text);
 }
 
 /* Leaflet overrides */

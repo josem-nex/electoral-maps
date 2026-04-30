@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Electoral Maps · Rediseño</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+
+  <link rel="stylesheet" href="civica.css"/>
+  <link rel="stylesheet" href="editorial.css"/>
+
+  <style>
+    body { margin: 0; background: #0d0e12; font-family: 'Inter', sans-serif; }
+    /* Make artboard surfaces look distinct from canvas */
+    .ed-app, .civica-app { isolation: isolate; }
+  </style>
+
+  <template id="__bundler_thumbnail">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
+      <rect width="100" height="100" fill="#1D4E89"/>
+      <circle cx="50" cy="50" r="22" fill="none" stroke="#fff" stroke-width="3"/>
+      <path d="M50 28 v44 M28 50 h44" stroke="#fff" stroke-width="3"/>
+    </svg>
+  </template>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <!-- Data -->
+  <script src="data.js"></script>
+  <script src="colombia-map.js"></script>
+
+  <!-- Variante A: Cívica -->
+  <script type="text/babel" src="civica-part1.jsx"></script>
+  <script type="text/babel" src="civica-part2.jsx"></script>
+  <script type="text/babel" src="civica-app.jsx"></script>
+
+  <!-- Variante B: Editorial -->
+  <script type="text/babel" src="editorial-part1.jsx"></script>
+  <script type="text/babel" src="editorial-part2.jsx"></script>
+
+  <!-- Canvas + Tweaks -->
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+      "primary_civica": "#1D4E89",
+      "primary_editorial": "#131418",
+      "density": "compact"
+    }/*EDITMODE-END*/;
+
+    function Root() {
+      const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+      // Apply tweaks live as CSS variable overrides
+      useEffect(() => {
+        const root = document.documentElement;
+        root.style.setProperty('--civ-primary', tweaks.primary_civica);
+        // Derived softer hue
+        root.style.setProperty('--civ-primary-soft', tweaks.primary_civica + '14');
+        root.style.setProperty('--ed-ink', tweaks.primary_editorial);
+        // Update density data-attr on both apps
+        document.querySelectorAll('.civica-app, .ed-app').forEach(el => {
+          el.setAttribute('data-density', tweaks.density);
+        });
+      }, [tweaks]);
+
+      return (
+        <>
+          <DesignCanvas
+            title="Electoral Maps · Rediseño"
+            subtitle="Dos direcciones para reemplazar el flujo actual: filtros + tabs (Dashboard, Mapa, Reportes, Comparador). Datos mock 2022 1ra vuelta. Click en mapa → drill-down."
+          >
+            <DCSection id="civica" title="Variante A · Cívica" subtitle="Layout institucional. Azul + acentos por candidato. Familiar para usuarios técnicos.">
+              <DCArtboard id="civ-overview" label="Cívica · Vista completa" width={1440} height={1100}>
+                <CivicaApp/>
+              </DCArtboard>
+              <DCArtboard id="civ-mapa" label="Cívica · Mapa con detalle" width={1440} height={900}>
+                <CivicaAppFocus tab="mapa"/>
+              </DCArtboard>
+              <DCArtboard id="civ-reportes" label="Cívica · Reportes" width={1440} height={900}>
+                <CivicaAppFocus tab="reportes"/>
+              </DCArtboard>
+              <DCArtboard id="civ-comp" label="Cívica · Comparador" width={1440} height={1000}>
+                <CivicaAppFocus tab="comparador"/>
+              </DCArtboard>
+              <DCArtboard id="civ-puesto" label="Cívica · Detalle de Puesto Electoral" width={1100} height={780}>
+                <CivicaPuestoStandalone/>
+              </DCArtboard>
+            </DCSection>
+
+            <DCSection id="editorial" title="Variante B · Editorial" subtitle="Layout audaz, mapa protagonista, tipografía con serif para titulares. Más contemporáneo, ideal para audiencia amplia.">
+              <DCArtboard id="ed-overview" label="Editorial · Resumen" width={1440} height={1450}>
+                <EditorialApp/>
+              </DCArtboard>
+              <DCArtboard id="ed-mapa" label="Editorial · Mapa drill-down" width={1440} height={1000}>
+                <EditorialAppFocus tab="mapa"/>
+              </DCArtboard>
+              <DCArtboard id="ed-reportes" label="Editorial · Reportes" width={1440} height={1100}>
+                <EditorialAppFocus tab="reportes"/>
+              </DCArtboard>
+              <DCArtboard id="ed-comp" label="Editorial · Comparador" width={1440} height={900}>
+                <EditorialAppFocus tab="comparador"/>
+              </DCArtboard>
+              <DCArtboard id="ed-puesto" label="Editorial · Detalle de Puesto" width={1100} height={780}>
+                <EditorialPuestoStandalone/>
+              </DCArtboard>
+            </DCSection>
+          </DesignCanvas>
+
+          <TweaksPanel title="Tweaks">
+            <TweakSection title="Cívica · Variante A">
+              <TweakColor label="Color primario" value={tweaks.primary_civica}
+                onChange={(v) => setTweak('primary_civica', v)}/>
+            </TweakSection>
+            <TweakSection title="Editorial · Variante B">
+              <TweakColor label="Tinta principal" value={tweaks.primary_editorial}
+                onChange={(v) => setTweak('primary_editorial', v)}/>
+            </TweakSection>
+            <TweakSection title="Densidad (ambas)">
+              <TweakRadio
+                value={tweaks.density}
+                onChange={(v) => setTweak('density', v)}
+                options={[
+                  { value: 'compact', label: 'Compacto' },
+                  { value: 'comfortable', label: 'Cómodo' },
+                ]}
+              />
+            </TweakSection>
+          </TweaksPanel>
+        </>
+      );
+    }
+
+    /* Helpers — mount each variant focused on a particular tab */
+    function CivicaAppFocus({ tab }) {
+      // Force the app to start on a given tab via a wrapper
+      return (
+        <div ref={(el) => {
+          if (!el) return;
+          // After mount, simulate click on tab button
+          requestAnimationFrame(() => {
+            const labels = { mapa: 'Mapa', reportes: 'Reportes', comparador: 'Comparador' };
+            const target = labels[tab];
+            const btns = el.querySelectorAll('.civica-tab');
+            for (const b of btns) {
+              if (b.textContent.includes(target)) { b.click(); break; }
+            }
+          });
+        }}>
+          <CivicaApp/>
+        </div>
+      );
+    }
+    function EditorialAppFocus({ tab }) {
+      return (
+        <div ref={(el) => {
+          if (!el) return;
+          requestAnimationFrame(() => {
+            const labels = { mapa: 'Mapa', reportes: 'Reportes', comparador: 'Comparador' };
+            const target = labels[tab];
+            const btns = el.querySelectorAll('.ed-nav-item');
+            for (const b of btns) {
+              if (b.textContent.includes(target)) { b.click(); break; }
+            }
+          });
+        }}>
+          <EditorialApp/>
+        </div>
+      );
+    }
+
+    function CivicaPuestoStandalone() {
+      return (
+        <div className="civica-app" data-density="comfortable" style={{padding:0,minHeight:0}}>
+          <div style={{padding: 24, position:'relative'}}>
+            <div className="civica-modal" style={{boxShadow:'none', border:'1px solid var(--civ-border)', maxHeight:'none'}}>
+              <PuestoBody/>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    function PuestoBody() {
+      const P1 = window.CivicaPart1;
+      const p = window.PUESTO_SAMPLE;
+      return (
+        <>
+          <div className="civica-modal-head">
+            <div>
+              <div className="civica-card-eyebrow">Puesto Electoral · {p.codigo}</div>
+              <h3 className="civica-modal-title">{p.nombre}</h3>
+              <div className="civica-modal-sub">{p.direccion}</div>
+            </div>
+          </div>
+          <div className="civica-modal-grid">
+            <div>
+              <div className="civica-modal-stats">
+                <div><div className="civica-detail-num">{p.mesas}</div><div className="civica-detail-lbl">Mesas</div></div>
+                <div><div className="civica-detail-num">{p.potencial.toLocaleString('es-CO')}</div><div className="civica-detail-lbl">Potencial</div></div>
+                <div><div className="civica-detail-num">{p.votosEmitidos.toLocaleString('es-CO')}</div><div className="civica-detail-lbl">Votos</div></div>
+                <div><div className="civica-detail-num">{(p.votosEmitidos/p.potencial*100).toFixed(1)}%</div><div className="civica-detail-lbl">Particip.</div></div>
+              </div>
+              <div className="civica-detail-section">
+                <div className="civica-detail-section-title">Resultados</div>
+                <div className="civica-mini-bars">
+                  {p.resultados.map(r => {
+                    const c = P1.candidatoById(r.id);
+                    const pct = (r.votos/p.votosEmitidos)*100;
+                    return (
+                      <div key={r.id} className="civica-mini-bar">
+                        <span className="civica-mini-name">{c.nombre}</span>
+                        <div className="civica-mini-track"><div className="civica-mini-fill" style={{width:`${pct}%`,background:c.color}}/></div>
+                        <span className="civica-mini-pct">{r.votos.toLocaleString('es-CO')} · {pct.toFixed(1)}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <div>
+              <div className="civica-modal-loc">
+                <div className="civica-modal-loc-row"><span>Departamento</span><strong>{p.departamento}</strong></div>
+                <div className="civica-modal-loc-row"><span>Municipio</span><strong>{p.municipio}</strong></div>
+                <div className="civica-modal-loc-row"><span>Zona</span><strong>{p.zona}</strong></div>
+                <div className="civica-modal-loc-row"><span>Coords</span><strong>{p.lat.toFixed(4)}, {p.lon.toFixed(4)}</strong></div>
+              </div>
+              <div className="civica-mini-pin">
+                <svg viewBox="0 0 200 200" className="civica-pin-svg">
+                  <rect x="0" y="0" width="200" height="200" fill="#f1f5f9"/>
+                  {[0,1,2,3,4].map(i => (<line key={i} x1="0" x2="200" y1={i*40+20} y2={i*40+20} stroke="#e2e8f0" strokeWidth="0.5"/>))}
+                  {[0,1,2,3,4].map(i => (<line key={'v'+i} y1="0" y2="200" x1={i*40+20} x2={i*40+20} stroke="#e2e8f0" strokeWidth="0.5"/>))}
+                  <circle cx="100" cy="100" r="22" fill="var(--civ-primary)" fillOpacity="0.18"/>
+                  <circle cx="100" cy="100" r="8" fill="var(--civ-primary)" stroke="#fff" strokeWidth="2"/>
+                </svg>
+                <div className="civica-pin-cap">Ubicación aproximada · Leaflet en producción</div>
+              </div>
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    function EditorialPuestoStandalone() {
+      const E2 = window.Editorial;
+      const p = window.PUESTO_SAMPLE;
+      return (
+        <div className="ed-app" data-density="comfortable" style={{padding:24,minHeight:0,background:'var(--ed-bg)'}}>
+          <div className="ed-modal" style={{boxShadow:'none', border:'1px solid var(--ed-line)', maxHeight:'none'}}>
+            <div className="ed-modal-head">
+              <div>
+                <div className="ed-eyebrow">Puesto Electoral · {p.codigo}</div>
+                <h3 className="ed-modal-title">{p.nombre}</h3>
+                <div className="ed-modal-sub"><E2.IconPin/> {p.direccion}</div>
+              </div>
+            </div>
+            <div className="ed-modal-body">
+              <div className="ed-modal-stats">
+                <div><div className="ed-bignum-sm">{p.mesas}</div><div className="ed-biglbl">Mesas</div></div>
+                <div><div className="ed-bignum-sm">{p.potencial.toLocaleString('es-CO')}</div><div className="ed-biglbl">Potencial</div></div>
+                <div><div className="ed-bignum-sm">{p.votosEmitidos.toLocaleString('es-CO')}</div><div className="ed-biglbl">Emitidos</div></div>
+                <div><div className="ed-bignum-sm">{(p.votosEmitidos/p.potencial*100).toFixed(1)}%</div><div className="ed-biglbl">Particip.</div></div>
+              </div>
+              <div className="ed-modal-grid">
+                <div>
+                  <div className="ed-jsection-title">Resultados</div>
+                  {p.resultados.map(r => {
+                    const c = E2.candidatoById(r.id);
+                    const pct = (r.votos/p.votosEmitidos)*100;
+                    return (
+                      <div key={r.id} className="ed-jrow">
+                        <span className="ed-jrow-name">{c.nombre}</span>
+                        <span className="ed-jrow-bar"><span style={{width:`${pct}%`,background:c.color}}/></span>
+                        <span className="ed-jrow-pct">{r.votos.toLocaleString('es-CO')} · {pct.toFixed(1)}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div>
+                  <div className="ed-modal-loc">
+                    <div className="ed-loc-row"><span>Departamento</span><strong>{p.departamento}</strong></div>
+                    <div className="ed-loc-row"><span>Municipio</span><strong>{p.municipio}</strong></div>
+                    <div className="ed-loc-row"><span>Zona</span><strong>{p.zona}</strong></div>
+                    <div className="ed-loc-row"><span>Coords</span><strong>{p.lat.toFixed(4)}, {p.lon.toFixed(4)}</strong></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<Root/>);
+  </script>
+</body>
+</html>
