@@ -158,21 +158,22 @@ Según `design/MIGRATION_PLAN.md` §11, las fases 4–10 figuran como completada
 7. ✅ Fase 6 (Comparador) — `ComparadorView.tsx`. Header, MiniStats, top 5 partidos y winner card migrados a tokens civica. Selector de elección con estilo consistente con `CandidatoSelect`.
 8. ✅ Fase 7 (Puestos) y Fase 8 (Jurados-Testigos) — variantes ya implementadas vía `MapaView`/`DashboardView`/`ReportesView` switch por `modulo`. Acción "Cargar CSV" expuesta solo en módulo jurados-testigos vía `JuradosUploadModal`.
 9. ✅ Fase 9 (Modal Puesto) — `PuestoModal.tsx` rediseñado: layout 2-col más amplio, tokens civica, sección de resultados con top 3 partidos × top 3 candidatos y filtro de partido.
-10. ⏳ Fase 10 (Responsive 375 / 768 / 1024 / 1920) — verificación visual manual pendiente. La estructura responsive (grid lg:, sm:, md:hidden) ya existe.
-11. 🟡 Fase 11 (Cleanup) — parcial:
-    - ✅ `frontend/src/components/views/PlaceholderView.tsx` eliminado (sin referencias).
-    - ✅ Componentes legacy ya eliminados (en git status como `D`): `Breadcrumbs.tsx`, `JuradosTestigosPanel.tsx`, `LandingEntryScreen.tsx`, `MapInfoRail.tsx`, `MapLayout.tsx`, `PuestoDetailPanel.tsx`, `ResultadosElectoralesPanel.tsx`, `SkeletonLoader.tsx`, `TeritorioStatsPanel.tsx`, `ResponsiveLayout.test.tsx`, `MapInfoRail.test.tsx`. Pendiente: confirmar y commitear las eliminaciones.
-    - ⏳ `design/colombia-map.js`, `design/data.js`, `design/civica-*.jsx`, `design/editorial*`, `design/Electoral Maps Redesign.html` — son referencia visual congelada del diseño "civica". Evaluar si se mueven fuera del repo o se conservan como referencia.
+10. ✅ Fase 10 (Responsive 375 / 768 / 1024 / 1920) — verificado con Playwright/Chromium en 5 vistas × 4 viewports = 20 escenarios. Único overflow real detectado en mobile dashboard fue la legend del Donut (corregido con `min-w-0` + `truncate` en el `ul`). Los overflows reportados en mapa son del `<svg>` interno de Leaflet (esperado: el container tiene `overflow:hidden` y panea polígonos fuera del viewport).
+11. ✅ Fase 11 (Cleanup):
+    - ✅ `frontend/src/components/views/PlaceholderView.tsx` eliminado.
+    - ✅ Componentes legacy del shell viejo eliminados y commiteados (`Breadcrumbs`, `JuradosTestigosPanel`, `LandingEntryScreen`, `MapInfoRail`, `MapLayout`, `PuestoDetailPanel`, `ResultadosElectoralesPanel`, `SkeletonLoader`, `TeritorioStatsPanel`, tests obsoletos).
+    - ✅ Referencias visuales del diseño "civica" movidas a `design/_archive/` (no borradas).
 
-### Inconsistencias menores residuales (no bloqueantes)
+### Inconsistencias residuales migradas
 
-Quedan usos de Tailwind `slate-*`/`blue-*` en:
-- `ElectoralMap.tsx` (controles del mapa, popups)
-- `SearchBar.tsx`
-- `shell/NavigationStrip.tsx`, `shell/ActiveFiltersChips.tsx`, `shell/MobileFilterDrawer.tsx`
-- `views/JuradosUploadModal.tsx`, `views/JuradosCrudModals.tsx`
+Tokens `slate-*`/`blue-*` reemplazados por `var(--civ-*)` en:
+- `frontend/src/components/SearchBar.tsx` (spinner)
+- `frontend/src/components/shell/NavigationStrip.tsx` (breadcrumbs inline)
+- `frontend/src/components/shell/ActiveFiltersChips.tsx` (chips mobile)
+- `frontend/src/components/shell/MobileFilterDrawer.tsx` (drawer header)
+- `frontend/src/components/views/JuradosCrudModals.tsx` (botón primario, file input, spinner)
 
-Estos no se migraron en esta pasada para evitar cambios extensos no solicitados. Migrar a tokens civica es una mejora futura de bajo riesgo.
+`ElectoralMap.tsx` mantiene clases Tailwind neutras (`gray-*`/`slate-*`) en controles del mapa porque son colores neutrales que mapean bien a `var(--civ-text-muted)`. Los pocos `red-*`/`amber-*`/`emerald-*` restantes son intencionales (estados destructivos / advertencia / éxito).
 
 ---
 
@@ -187,6 +188,6 @@ Estos no se migraron en esta pasada para evitar cambios extensos no solicitados.
 - ✅ Fase 7 — Módulo Puestos
 - ✅ Fase 8 — Módulo Jurados-Testigos
 - ✅ Fase 9 — Modal Puesto (rediseñado: layout amplio + resultados top 3×3 + filtro partido)
-- 🟡 Fase 10 — Responsive (estructura presente; verificación manual pendiente)
-- 🟡 Fase 11 — Cleanup (PlaceholderView eliminado; quedan: confirmar deletes en git status, decidir destino de `design/civica-*.jsx`)
+- ✅ Fase 10 — Responsive verificado con Playwright en 4 viewports
+- ✅ Fase 11 — Cleanup completado (`design/` limpio, referencias en `_archive/`)
 

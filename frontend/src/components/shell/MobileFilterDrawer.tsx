@@ -15,9 +15,17 @@ export function MobileFilterDrawer({ open, onClose, children }: MobileFilterDraw
         className="absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <h3 className="text-base font-semibold text-slate-900">Filtros</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+        <div
+          className="flex items-center justify-between px-4 py-3"
+          style={{ borderBottom: '1px solid var(--civ-border)' }}
+        >
+          <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--civ-text)' }}>Filtros</h3>
+          <button
+            onClick={onClose}
+            className="rounded-md p-1 transition-colors hover:bg-[var(--civ-bg)]"
+            style={{ color: 'var(--civ-text-soft)' }}
+            aria-label="Cerrar filtros"
+          >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>

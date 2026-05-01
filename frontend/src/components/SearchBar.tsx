@@ -158,7 +158,13 @@ export function SearchBar() {
       )}
       {isSearching && (
         <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
-          <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+          <div
+            className="animate-spin h-5 w-5 rounded-full"
+            style={{
+              border: '2px solid var(--civ-primary)',
+              borderTopColor: 'transparent',
+            }}
+          />
         </div>
       )}
 

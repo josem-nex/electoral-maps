@@ -32,17 +32,32 @@ export function NavigationStrip() {
       className="civ-card flex shrink-0 items-center justify-between"
       style={{ padding: '8px 14px', gap: 12 }}
     >
-      <div className="min-w-0 flex-1 flex items-center gap-1 text-xs text-slate-500 truncate">
-        {navigationStack.map((j, i) => (
-          <span key={j.id} className="flex items-center gap-1 min-w-0">
-            {i > 0 && <span className="shrink-0 text-slate-300">/</span>}
-            <span className={i === navigationStack.length - 1 && !selectedMunicipioCode ? 'font-medium text-slate-700 truncate' : 'truncate'}>{j.name}</span>
-          </span>
-        ))}
+      <div
+        className="min-w-0 flex-1 flex items-center gap-1 truncate"
+        style={{ fontSize: 12, color: 'var(--civ-text-muted)' }}
+      >
+        {navigationStack.map((j, i) => {
+          const isLast = i === navigationStack.length - 1 && !selectedMunicipioCode;
+          return (
+            <span key={j.id} className="flex items-center gap-1 min-w-0">
+              {i > 0 && (
+                <span className="shrink-0" style={{ color: 'var(--civ-text-soft)' }}>/</span>
+              )}
+              <span
+                className="truncate"
+                style={isLast ? { fontWeight: 600, color: 'var(--civ-text)' } : undefined}
+              >
+                {j.name}
+              </span>
+            </span>
+          );
+        })}
         {selectedMunicipioName && (
           <span className="flex items-center gap-1 min-w-0">
-            <span className="shrink-0 text-slate-300">/</span>
-            <span className="font-medium text-slate-700 truncate">{selectedMunicipioName}</span>
+            <span className="shrink-0" style={{ color: 'var(--civ-text-soft)' }}>/</span>
+            <span className="truncate" style={{ fontWeight: 600, color: 'var(--civ-text)' }}>
+              {selectedMunicipioName}
+            </span>
           </span>
         )}
       </div>

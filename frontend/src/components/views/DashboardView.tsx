@@ -288,13 +288,13 @@ function Top10Bars({ items }: { items: { code: string; name: string; votos: numb
         return (
           <div key={d.code} className="flex items-center gap-2 text-sm">
             <div
-              className="w-6 text-right tabular-nums"
+              className="w-6 shrink-0 text-right tabular-nums"
               style={{ fontSize: 11, color: 'var(--civ-text-muted)', fontWeight: 600 }}
             >
               {String(i + 1).padStart(2, '0')}
             </div>
             <div
-              className="w-32 truncate"
+              className="w-20 shrink-0 truncate sm:w-28 lg:w-32"
               style={{ fontSize: 12, color: 'var(--civ-text)', fontWeight: 600 }}
             >
               {d.name}
@@ -313,7 +313,7 @@ function Top10Bars({ items }: { items: { code: string; name: string; votos: numb
               />
             </div>
             <div
-              className="w-24 text-right tabular-nums"
+              className="w-16 shrink-0 text-right tabular-nums sm:w-24"
               style={{ fontSize: 11, color: 'var(--civ-text-muted)' }}
             >
               {fmt(d.votos)}
@@ -366,12 +366,22 @@ function Donut({ segments, totalLabel }: { segments: DonutSegment[]; totalLabel:
           votos válidos
         </text>
       </svg>
-      <ul className="flex-1 text-sm" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <ul
+        className="w-full min-w-0 flex-1 text-sm sm:w-auto"
+        style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
+      >
         {segments.map((d) => (
-          <li key={d.id} className="flex items-center gap-2">
+          <li key={d.id} className="flex min-w-0 items-center gap-2">
             <span className="h-3 w-3 shrink-0 rounded-sm" style={{ background: d.color }} />
-            <span className="flex-1 truncate" style={{ fontSize: 12, color: 'var(--civ-text)' }}>{d.nombre}</span>
-            <span className="tabular-nums" style={{ fontSize: 11, color: 'var(--civ-text-muted)' }}>{fmtPct(d.pct, 2)}</span>
+            <span
+              className="min-w-0 flex-1 truncate"
+              style={{ fontSize: 12, color: 'var(--civ-text)' }}
+            >
+              {d.nombre}
+            </span>
+            <span className="shrink-0 tabular-nums" style={{ fontSize: 11, color: 'var(--civ-text-muted)' }}>
+              {fmtPct(d.pct, 2)}
+            </span>
           </li>
         ))}
       </ul>

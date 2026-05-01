@@ -77,7 +77,7 @@ export function UploadModal({ estado, onClose, onSuccess }: UploadModalProps) {
                   type="file"
                   accept=".xlsx,.xls,.csv"
                   onChange={handleFileChange}
-                  className="block w-full text-sm text-slate-500 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
+                  className="block w-full text-sm text-slate-500 file:mr-4 file:rounded-lg file:border-0 file:bg-[var(--civ-primary-soft)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[var(--civ-primary)] hover:file:bg-[var(--civ-primary)]/10"
                 />
                 {file && <p className="mt-1 text-xs text-slate-500">{file.name}</p>}
               </div>
@@ -103,7 +103,13 @@ export function UploadModal({ estado, onClose, onSuccess }: UploadModalProps) {
                 <button onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
                   Cancelar
                 </button>
-                <button onClick={handleProceed} className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">
+                <button
+                  onClick={handleProceed}
+                  className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors"
+                  style={{ background: 'var(--civ-primary)' }}
+                  onMouseOver={(e) => { e.currentTarget.style.background = 'var(--civ-primary-hover)'; }}
+                  onMouseOut={(e) => { e.currentTarget.style.background = 'var(--civ-primary)'; }}
+                >
                   Continuar
                 </button>
               </div>
@@ -138,7 +144,10 @@ export function UploadModal({ estado, onClose, onSuccess }: UploadModalProps) {
 
           {stage === 'loading' && (
             <div className="flex items-center gap-3 py-4">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+              <div
+                className="h-5 w-5 animate-spin rounded-full"
+                style={{ border: '2px solid var(--civ-primary)', borderTopColor: 'transparent' }}
+              />
               <p className="text-sm text-slate-600">Procesando archivo…</p>
             </div>
           )}
