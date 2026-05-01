@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useUIFiltersStore } from '../../stores/uiFiltersStore';
 import { TipoEleccionSelect } from './TipoEleccionSelect';
-import { CandidatoSelect } from './CandidatoSelect';
+import { CandidatoSelect, PartidoSelect } from './CandidatoSelect';
 import { SearchBar } from '../SearchBar';
 import { JuradosManagerModal } from '../views/JuradosUploadModal';
 
@@ -19,35 +19,26 @@ const FIELD_LABEL: React.CSSProperties = {
   display: 'block',
 };
 
-const SELECT_STYLES: React.CSSProperties = {
-  width: '100%',
-  height: 38,
-  padding: '0 10px',
-  border: '1px solid var(--civ-border)',
-  borderRadius: 8,
-  background: '#fff',
-  fontSize: 13,
-  color: 'var(--civ-text)',
-  outline: 'none',
-  cursor: 'pointer',
-};
-
 /** Filter fields without the bar wrapper — reused inside the desktop bar and the mobile drawer. */
 export function FilterFields({ layout = 'horizontal' }: FilterFieldsProps) {
-  const { modulo, nivel, setNivel } = useUIFiltersStore();
-  const showCandidato = modulo === 'resultados';
+  const { modulo, corporacion } = useUIFiltersStore();
+  const showResultsFilters = modulo === 'resultados';
+  const isPresidencial = corporacion === 'P01' || corporacion === 'P02';
+  // Presidencial: only candidato. Otherwise: partido + candidato (filtered by partido).
+  const showPartido = showResultsFilters && !isPresidencial;
   const showJuradosManage = modulo === 'jurados-testigos';
   const [juradosOpen, setJuradosOpen] = useState(false);
 
   const stacked = layout === 'stacked';
 
-  // Build the grid template based on visibility (matches design's 1.4fr 1fr 1.4fr 2fr auto)
-  // Candidato (1.4) · Nivel (1) · Tipo (1.4) · Search (2) · [Personal btn auto]
-  const gridTemplate = stacked
-    ? '1fr'
-    : showCandidato
-      ? (showJuradosManage ? '1.4fr 1fr 1.4fr 2fr auto' : '1.4fr 1fr 1.4fr 2fr')
-      : (showJuradosManage ? '1fr 1.4fr 2fr auto' : '1fr 1.4fr 2fr');
+  // Tipo (1.4) · [Partido 1.2] · [Candidato 1.4] · Search (2) · [Personal auto]
+  const cols: string[] = [];
+  cols.push('1.4fr'); // Tipo
+  if (showPartido) cols.push('1.2fr'); // Partido
+  if (showResultsFilters) cols.push('1.4fr'); // Candidato
+  cols.push('2fr'); // Buscar
+  if (showJuradosManage) cols.push('auto'); // Personal
+  const gridTemplate = stacked ? '1fr' : cols.join(' ');
 
   return (
     <div
@@ -58,29 +49,24 @@ export function FilterFields({ layout = 'horizontal' }: FilterFieldsProps) {
         alignItems: 'end',
       }}
     >
-      {showCandidato && (
-        <div className="min-w-0">
-          <label style={FIELD_LABEL}>Candidato / Partido</label>
-          <CandidatoSelect />
-        </div>
-      )}
-
-      <div className="min-w-0">
-        <label style={FIELD_LABEL}>Nivel</label>
-        <select
-          value={nivel}
-          onChange={(e) => setNivel(e.target.value as 'departamentos' | 'municipio')}
-          style={SELECT_STYLES}
-        >
-          <option value="departamentos">Departamentos</option>
-          <option value="municipio">Municipios</option>
-        </select>
-      </div>
-
       <div className="min-w-0">
         <label style={FIELD_LABEL}>Tipo de Elección</label>
         <TipoEleccionSelect />
       </div>
+
+      {showPartido && (
+        <div className="min-w-0">
+          <label style={FIELD_LABEL}>Partido</label>
+          <PartidoSelect />
+        </div>
+      )}
+
+      {showResultsFilters && (
+        <div className="min-w-0">
+          <label style={FIELD_LABEL}>Candidato</label>
+          <CandidatoSelect />
+        </div>
+      )}
 
       <div className="min-w-0">
         <label style={FIELD_LABEL}>Buscar</label>

@@ -7,6 +7,12 @@ import { useRouteSync } from './hooks/useRouteSync';
 
 export type ActiveView = 'puestos' | 'resultados' | 'jurados-testigos';
 
+const DEFAULT_ENTRY = '/resultados/2026?corp=001';
+
+function EntryRedirect() {
+  return <Navigate to={DEFAULT_ENTRY} replace />;
+}
+
 function ShellLayout() {
   useEleccionUrlSync();
   useRouteSync();
@@ -21,11 +27,11 @@ function ShellLayout() {
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/resultados/2022" replace />} />
+      <Route path="/" element={<EntryRedirect />} />
       <Route path="/puestos/*" element={<ShellLayout />} />
       <Route path="/resultados/:year/*" element={<ShellLayout />} />
       <Route path="/jurados-testigos/*" element={<ShellLayout />} />
-      <Route path="*" element={<Navigate to="/resultados/2022" replace />} />
+      <Route path="*" element={<EntryRedirect />} />
     </Routes>
   );
 }

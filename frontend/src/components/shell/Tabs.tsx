@@ -1,4 +1,6 @@
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useUIFiltersStore, type ActiveTab } from '../../stores/uiFiltersStore';
+import { useNavigationStore } from '../../stores/navigationStore';
 
 interface TabDef {
   id: ActiveTab;
@@ -55,12 +57,30 @@ const ALL_TABS: TabDef[] = [
 ];
 
 export function Tabs() {
-  const { modulo, activeTab, setActiveTab } = useUIFiltersStore();
+  const { modulo, anio, activeTab, setActiveTab } = useUIFiltersStore();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const tabs = ALL_TABS.filter((t) => {
     if (t.id === 'comparador' && modulo !== 'resultados') return false;
     return true;
   });
+
+  const handleTabClick = (id: typeof activeTab) => {
+    if (id !== 'mapa') {
+      // Reset territorial state and strip drill-down segments from URL
+      useNavigationStore.getState().reset();
+      const basePath =
+        modulo === 'resultados' ? `/resultados/${anio}` :
+        modulo === 'puestos' ? '/puestos' :
+        '/jurados-testigos';
+      const search = new URLSearchParams(location.search);
+      search.set('tab', id);
+      const target = basePath + (search.toString() ? '?' + search.toString() : '');
+      navigate(target, { replace: true });
+    }
+    setActiveTab(id);
+  };
 
   return (
     <nav
@@ -73,7 +93,7 @@ export function Tabs() {
           <button
             key={t.id}
             type="button"
-            onClick={() => setActiveTab(t.id)}
+            onClick={() => handleTabClick(t.id)}
             className="inline-flex shrink-0 items-center transition-all"
             style={{
               gap: 8,

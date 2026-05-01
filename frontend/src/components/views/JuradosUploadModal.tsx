@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api, type PersonalEstado } from '../../api/client';
-import { UploadModal, DeleteModal } from '../JuradosTestigosPanel';
+import { UploadModal, DeleteModal } from './JuradosCrudModals';
 
 interface JuradosManagerModalProps {
   open: boolean;

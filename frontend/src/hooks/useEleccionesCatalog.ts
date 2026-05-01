@@ -16,6 +16,7 @@ export interface EleccionGroup {
 const RESULTADOS: EleccionOption[] = [
   // Presidenciales
   { id: 'pres-2018-1', label: 'Presidencial 2018 · 1ª Vuelta', modulo: 'resultados', anio: 2018, corporacion: 'P01' },
+  { id: 'pres-2018-2', label: 'Presidencial 2018 · 2ª Vuelta', modulo: 'resultados', anio: 2018, corporacion: 'P02' },
   { id: 'pres-2022-1', label: 'Presidencial 2022 · 1ª Vuelta', modulo: 'resultados', anio: 2022, corporacion: 'P01' },
   { id: 'pres-2022-2', label: 'Presidencial 2022 · 2ª Vuelta', modulo: 'resultados', anio: 2022, corporacion: 'P02' },
   // Congreso

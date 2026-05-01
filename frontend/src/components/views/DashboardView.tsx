@@ -138,6 +138,8 @@ function ResultadosDashboard() {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setPaisRes(null);
+    setByDepto(new Map());
     (async () => {
       try {
         const [pais, catalog] = await Promise.all([
@@ -188,20 +190,38 @@ function ResultadosDashboard() {
     return items.sort((a, b) => b.votos - a.votos).slice(0, 10);
   }, [byDepto, departamentos, candidatoFiltro]);
 
-  const partidoSegments = useMemo(() => {
+  const isPresidencial = corporacion === 'P01' || corporacion === 'P02';
+
+  const distribSegments = useMemo(() => {
     if (!paisRes) return [];
     const total = paisRes.partidos.reduce((s, p) => s + p.partido_votos, 0);
+    if (isPresidencial) {
+      // Each partido has 1 candidato in presidenciales; show candidatos
+      const cands = paisRes.partidos.flatMap((p) =>
+        p.top5_candidatos.map((c) => ({
+          id: c.codigo || `${p.partido_codigo}-${c.nombre}`,
+          nombre: c.nombre || p.partido_nombre || '—',
+          votos: c.votos,
+          pct: total > 0 ? (c.votos / total) * 100 : 0,
+        })),
+      );
+      return cands
+        .sort((a, b) => b.votos - a.votos)
+        .slice(0, 8)
+        .map((c, i) => ({ ...c, color: PARTY_COLORS[i % PARTY_COLORS.length] }));
+    }
     return paisRes.partidos
       .slice()
       .sort((a, b) => b.partido_votos - a.partido_votos)
       .slice(0, 8)
       .map((p, i) => ({
-        nombre: p.partido_nombre,
+        id: p.partido_codigo || `partido-${i}`,
+        nombre: p.partido_nombre || '—',
         votos: p.partido_votos,
         pct: total > 0 ? (p.partido_votos / total) * 100 : 0,
         color: PARTY_COLORS[i % PARTY_COLORS.length],
       }));
-  }, [paisRes]);
+  }, [paisRes, isPresidencial]);
 
   return (
     <div className="space-y-4">
@@ -247,10 +267,10 @@ function ResultadosDashboard() {
         <div className="civ-card" style={{ padding: 16 }}>
           <div style={{ marginBottom: 14 }}>
             <div className="civ-eyebrow">Distribución</div>
-            <h3 className="civ-card-title" style={{ marginTop: 4 }}>Por partido (nacional)</h3>
+            <h3 className="civ-card-title" style={{ marginTop: 4 }}>{isPresidencial ? 'Por candidato (nacional)' : 'Por partido (nacional)'}</h3>
           </div>
           {!paisRes && <div className="py-8 text-center" style={{ color: 'var(--civ-text-muted)' }}>{loading ? 'Cargando…' : '—'}</div>}
-          {paisRes && <Donut segments={partidoSegments} totalLabel={fmtShort(paisRes.votos_validos)} />}
+          {paisRes && <Donut segments={distribSegments} totalLabel={fmtShort(paisRes.votos_validos)} />}
         </div>
       </div>
     </div>
@@ -262,17 +282,42 @@ const PARTY_COLORS = ['#1D4E89', '#D62828', '#F77F00', '#06A77D', '#7B2CBF', '#0
 function Top10Bars({ items }: { items: { code: string; name: string; votos: number }[] }) {
   const max = Math.max(1, ...items.map((d) => d.votos));
   return (
-    <div className="space-y-1.5">
+    <div className="flex flex-col" style={{ gap: 6 }}>
       {items.map((d, i) => {
         const pct = (d.votos / max) * 100;
         return (
           <div key={d.code} className="flex items-center gap-2 text-sm">
-            <div className="w-6 text-right font-mono text-xs text-slate-400">{String(i + 1).padStart(2, '0')}</div>
-            <div className="w-32 truncate text-slate-700">{d.name}</div>
-            <div className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full rounded-full bg-blue-600" style={{ width: `${pct}%` }} />
+            <div
+              className="w-6 text-right tabular-nums"
+              style={{ fontSize: 11, color: 'var(--civ-text-muted)', fontWeight: 600 }}
+            >
+              {String(i + 1).padStart(2, '0')}
             </div>
-            <div className="w-24 text-right font-mono text-xs text-slate-700">{fmt(d.votos)}</div>
+            <div
+              className="w-32 truncate"
+              style={{ fontSize: 12, color: 'var(--civ-text)', fontWeight: 600 }}
+            >
+              {d.name}
+            </div>
+            <div
+              className="relative flex-1 overflow-hidden"
+              style={{ height: 8, borderRadius: 99, background: 'var(--civ-bg)' }}
+            >
+              <div
+                style={{
+                  height: '100%',
+                  width: `${pct}%`,
+                  background: 'var(--civ-primary)',
+                  borderRadius: 99,
+                }}
+              />
+            </div>
+            <div
+              className="w-24 text-right tabular-nums"
+              style={{ fontSize: 11, color: 'var(--civ-text-muted)' }}
+            >
+              {fmt(d.votos)}
+            </div>
           </div>
         );
       })}
@@ -280,7 +325,7 @@ function Top10Bars({ items }: { items: { code: string; name: string; votos: numb
   );
 }
 
-interface DonutSegment { nombre: string; votos: number; pct: number; color: string }
+interface DonutSegment { id: string; nombre: string; votos: number; pct: number; color: string }
 function Donut({ segments, totalLabel }: { segments: DonutSegment[]; totalLabel: string }) {
   const size = 220;
   const r = size / 2 - 18;
@@ -313,21 +358,20 @@ function Donut({ segments, totalLabel }: { segments: DonutSegment[]; totalLabel:
           y={cy - 2}
           textAnchor="middle"
           dominantBaseline="middle"
-          className="fill-slate-900"
-          style={{ fontSize: labelFontSize, fontWeight: 700, letterSpacing: '-0.02em' }}
+          style={{ fontSize: labelFontSize, fontWeight: 700, letterSpacing: '-0.02em', fill: 'var(--civ-text)' }}
         >
           {totalLabel}
         </text>
-        <text x={cx} y={cy + 16} textAnchor="middle" className="fill-slate-500" style={{ fontSize: 10 }}>
+        <text x={cx} y={cy + 16} textAnchor="middle" style={{ fontSize: 10, fill: 'var(--civ-text-muted)' }}>
           votos válidos
         </text>
       </svg>
-      <ul className="flex-1 space-y-1 text-sm">
+      <ul className="flex-1 text-sm" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {segments.map((d) => (
-          <li key={d.nombre} className="flex items-center gap-2">
+          <li key={d.id} className="flex items-center gap-2">
             <span className="h-3 w-3 shrink-0 rounded-sm" style={{ background: d.color }} />
-            <span className="flex-1 truncate text-slate-700">{d.nombre}</span>
-            <span className="font-mono text-xs text-slate-500">{fmtPct(d.pct, 2)}</span>
+            <span className="flex-1 truncate" style={{ fontSize: 12, color: 'var(--civ-text)' }}>{d.nombre}</span>
+            <span className="tabular-nums" style={{ fontSize: 11, color: 'var(--civ-text-muted)' }}>{fmtPct(d.pct, 2)}</span>
           </li>
         ))}
       </ul>
@@ -391,12 +435,6 @@ function JuradosDashboard() {
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <KpiCard icon={<IconUsers />} label="Jurados registrados" value={estado ? fmt(estado.jurados) : (loading ? '…' : '—')} />
         <KpiCard icon={<IconShield />} label="Testigos registrados" value={estado ? fmt(estado.testigos) : (loading ? '…' : '—')} />
-      </div>
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center">
-        <div className="text-sm font-semibold text-slate-700">Carga de personal</div>
-        <p className="mt-1 text-xs text-slate-500">
-          La carga y eliminación de jurados / testigos se habilitará desde un modal en la siguiente fase.
-        </p>
       </div>
     </div>
   );

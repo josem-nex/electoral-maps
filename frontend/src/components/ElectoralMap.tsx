@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   MapContainer,
   GeoJSON,
@@ -13,9 +13,8 @@ import "leaflet/dist/leaflet.css";
 import { useNavigationStore } from "../stores/navigationStore";
 import { usePuestoModalStore } from "../stores/puestoModalStore";
 import { api } from "../api/client";
-import type { PuestoElectoral, TerritorioStats } from "../api/client";
+import type { PuestoElectoral } from "../api/client";
 import type { Jurisdiccion } from "../stores/navigationStore";
-import { MapInfoRail } from "./MapInfoRail";
 import {
   departmentCodeFromFeature,
   departmentNameFromFeature,
@@ -23,7 +22,6 @@ import {
   municipalityNameFromFeature,
   normalizeDepartmentCode,
   normalizeMunicipioCode,
-  type CanonicalTerritorySelection,
 } from "../utils/territory";
 import { compactArchipelagoFeatureCollection } from "../utils/mapGeometry";
 
@@ -269,19 +267,8 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
   const [allDepartamentos, setAllDepartamentos] = useState<Jurisdiccion[]>([]);
   const [departamentos, setDepartamentos] = useState<Jurisdiccion[]>([]);
   const [puestos, setPuestos] = useState<PuestoElectoral[]>([]);
-  const [selectedPuesto, setSelectedPuesto] = useState<PuestoElectoral | null>(
-    null,
-  );
   const [loadingCount, setLoadingCount] = useState(0);
 
-  // Territory stats panel state
-  const [territorioStats, setTerritorioStats] =
-    useState<TerritorioStats | null>(null);
-  const [territorioStatsLoading, setTerritorioStatsLoading] = useState(false);
-  const [territorioStatsError, setTerritorioStatsError] = useState(false);
-  const [territorioTipo, setTerritorioTipo] = useState<
-    "pais" | "zona" | "departamento" | "municipio" | null
-  >(null);
   const [consuladoMunicipios, setConsuladoMunicipios] = useState<
     ConsuladoMunicipioOption[]
   >([]);
@@ -300,8 +287,11 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
 
   // React Router navigate — kept in a ref so Leaflet event closures always have latest
   const navigate = useNavigate();
+  const location = useLocation();
   const navigateRef = useRef(navigate);
   useEffect(() => { navigateRef.current = navigate; }, [navigate]);
+  const searchRef = useRef(location.search);
+  useEffect(() => { searchRef.current = location.search; }, [location.search]);
 
   // activeView and selectedYear refs for use inside Leaflet event handlers (stale closures)
   const activeViewRef = useRef(activeView);
@@ -317,16 +307,6 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
 
   // Ref to the Leaflet GeoJSON layer so we can update styles without remounting
   const municipiosLayerRef = useRef<L.GeoJSON | null>(null);
-
-  // Ref to the right-side info panel (for mobile auto-scroll on puesto selection)
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll to info panel when a puesto is selected on mobile
-  useEffect(() => {
-    if (selectedPuesto && window.innerWidth < 1024) {
-      panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [selectedPuesto]);
 
   const center: [number, number] = currentJurisdiccion
     ? [currentJurisdiccion.center_lat, currentJurisdiccion.center_lon]
@@ -363,7 +343,6 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
       setSelectedMunicipioCode(null);
     }
 
-    setSelectedPuesto(null);
     setPuestos([]);
   }, [
     currentJurisdiccion?.layer,
@@ -507,74 +486,6 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
     currentJurisdiccion?.layer,
     currentJurisdiccion?.name,
     municipioFeatureByCode,
-  ]);
-
-  const selectedTerritory = useMemo<CanonicalTerritorySelection | null>(() => {
-    if (currentJurisdiccion?.layer === "municipio") {
-      const canonicalId = normalizeMunicipioCode(currentJurisdiccion.code);
-      return canonicalId ? { level: "municipio", canonicalId } : null;
-    }
-    if (
-      currentJurisdiccion?.layer === "departamentos" &&
-      selectedMunicipioCode
-    ) {
-      return { level: "municipio", canonicalId: selectedMunicipioCode };
-    }
-    if (selectedDepartmentCode) {
-      return { level: "departamento", canonicalId: selectedDepartmentCode };
-    }
-    return null;
-  }, [
-    currentJurisdiccion?.code,
-    currentJurisdiccion?.layer,
-    selectedDepartmentCode,
-    selectedMunicipioCode,
-  ]);
-
-  const selectedTerritoryName = useMemo(() => {
-    if (!selectedTerritory) {
-      return null;
-    }
-    if (selectedTerritory.level === "departamento") {
-      return departmentNameByCode.get(selectedTerritory.canonicalId) ?? null;
-    }
-    return municipioNameByCode.get(selectedTerritory.canonicalId) ?? null;
-  }, [departmentNameByCode, municipioNameByCode, selectedTerritory]);
-
-  const selectedTerritoryIntegrityError = useMemo(() => false, []);
-
-  const selectedPuestoTerritory = useMemo(() => {
-    if (!selectedPuesto) {
-      return null;
-    }
-
-    const municipioCode =
-      selectedTerritory?.level === "municipio"
-        ? selectedTerritory.canonicalId
-        : normalizeMunicipioCode(selectedPuesto.municipio_codigo);
-    const departamentoCode =
-      selectedTerritory?.level === "departamento"
-        ? selectedTerritory.canonicalId
-        : (normalizeDepartmentCode(selectedPuesto.departamento_codigo) ??
-          (municipioCode ? municipioCode.slice(0, 2) : null));
-
-    const municipio = municipioCode
-      ? (municipioNameByCode.get(municipioCode) ?? null)
-      : null;
-    const departamento = departamentoCode
-      ? (departmentNameByCode.get(departamentoCode) ?? null)
-      : null;
-
-    return {
-      municipio,
-      departamento,
-      integrityError: false,
-    };
-  }, [
-    departmentNameByCode,
-    municipioNameByCode,
-    selectedPuesto,
-    selectedTerritory,
   ]);
 
   const filteredDepartamentosGeoJSON = useMemo(() => {
@@ -911,19 +822,16 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
     if (currentJurisdiccion?.layer !== "departamentos") return;
     if (isConsuladosDepartmentView) {
       setPuestos([]);
-      setSelectedPuesto(null);
       return;
     }
     if (!selectedMunicipioCode) {
       setPuestos([]);
-      setSelectedPuesto(null);
       return;
     }
 
     const requestedMunicipioCode = selectedMunicipioCode;
     const requestedDepartmentCode = selectedDepartmentCode;
 
-    setSelectedPuesto(null);
     api
       .getPuestos({
         departamento_codigo: requestedDepartmentCode ?? undefined,
@@ -963,99 +871,13 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
     currentJurisdiccion?.layer,
   ]);
 
-  // Load aggregated territory statistics for the active territorial layer
-  useEffect(() => {
-    let isActive = true;
-
-    const layer = currentJurisdiccion?.layer;
-    if (
-      !layer ||
-      !["pais", "zonas", "departamentos", "municipio"].includes(layer)
-    ) {
-      setTerritorioStats(null);
-      setTerritorioStatsError(false);
-      return () => {
-        isActive = false;
-      };
-    }
-
-    let tipo: "pais" | "zona" | "departamento" | "municipio" | null = null;
-    let codigo: string | null = null;
-
-    if (layer === "pais") {
-      tipo = "pais";
-      codigo = "CO";
-    } else if (layer === "zonas") {
-      const zoneCode = currentJurisdiccion?.code?.trim();
-      if (zoneCode) {
-        tipo = "zona";
-        codigo = zoneCode;
-      }
-    } else if (layer === "departamentos") {
-      if (selectedMunicipioCode) {
-        tipo = "municipio";
-        codigo = selectedMunicipioCode;
-      } else if (selectedDepartmentCode) {
-        tipo = "departamento";
-        codigo = selectedDepartmentCode;
-      }
-    } else if (layer === "municipio" && currentJurisdiccion?.id) {
-      const parts = currentJurisdiccion.id.split(":");
-      const munCode = parts[1];
-      if (munCode) {
-        tipo = "municipio";
-        codigo = munCode;
-      }
-    }
-
-    if (!tipo || !codigo) {
-      setTerritorioStats(null);
-      setTerritorioStatsError(false);
-      return () => {
-        isActive = false;
-      };
-    }
-
-    setTerritorioTipo(tipo);
-    setTerritorioStatsLoading(true);
-    setTerritorioStatsError(false);
-    setTerritorioStats(null);
-
-    api
-      .getAnalyticsTerritorio(tipo, codigo)
-      .then((data) => {
-        if (!isActive) {
-          return;
-        }
-        setTerritorioStats(data);
-      })
-      .catch(() => {
-        if (isActive) {
-          setTerritorioStatsError(true);
-        }
-      })
-      .finally(() => {
-        if (isActive) {
-          setTerritorioStatsLoading(false);
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [
-    currentJurisdiccion?.layer,
-    currentJurisdiccion?.id,
-    currentJurisdiccion?.code,
-    selectedDepartmentCode,
-    selectedMunicipioCode,
-  ]);
-
-  // Returns the URL base for the current view, e.g. '/puestos' or '/resultados/2026'
+  // Returns the URL base for the current view, e.g. '/puestos' or '/resultados/2026'.
+  // Uses refs so that callbacks bound to Leaflet layers (which are not re-bound
+  // on every React render) always read the latest activeView and selectedYear.
   const getViewUrlBase = () =>
-    activeView === 'resultados'
-      ? `/resultados/${selectedYear}`
-      : `/${activeView}`;
+    activeViewRef.current === 'resultados'
+      ? `/resultados/${selectedYearRef.current}`
+      : `/${activeViewRef.current}`;
 
   const handleDepartmentClick = (feature: any) => {
     const deptCode = departmentCodeFromFeature(feature);
@@ -1086,7 +908,7 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
     if (dept) {
       setSelectedMunicipioCode(null);
       navigateTo(dept);
-      navigate(`${getViewUrlBase()}/${zoneCode ?? dept.zone_id ?? ''}/${dept.code}`);
+      navigateRef.current(`${getViewUrlBase()}/${zoneCode ?? dept.zone_id ?? ''}/${dept.code}${searchRef.current}`);
     } else {
       // Create jurisdiction on the fly
       const sourceFeature = departmentFeatureByCode.get(deptCode) ?? feature;
@@ -1102,7 +924,7 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
         center_lon: center.lng,
         zoom: 8.0,
       });
-      navigate(`${getViewUrlBase()}/${zoneCode ?? ''}/${deptCode}`);
+      navigateRef.current(`${getViewUrlBase()}/${zoneCode ?? ''}/${deptCode}${searchRef.current}`);
     }
   };
 
@@ -1144,7 +966,7 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
       center_lon: center.lng,
       zoom: 6.6,
     });
-    navigate(`${getViewUrlBase()}/${zone.id}`);
+    navigateRef.current(`${getViewUrlBase()}/${zone.id}${searchRef.current}`);
   };
 
   const zonePalette = [
@@ -1282,7 +1104,7 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
             ? `/resultados/${selectedYearRef.current}`
             : `/${activeViewRef.current}`;
           if (deptCode && zoneCode) {
-            navigateRef.current(`${base}/${zoneCode}/${deptCode}/${featureCode}`);
+            navigateRef.current(`${base}/${zoneCode}/${deptCode}/${featureCode}${searchRef.current}`);
           }
         } else {
           console.error(
@@ -1350,202 +1172,179 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
     };
   };
 
-  return (
-    <div className="h-full w-full bg-white">
-      <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-2">
-        <section className="relative min-h-[55vh] overflow-hidden bg-white lg:min-h-0">
-          <div className="absolute right-20 top-2.5 z-[1000]">
-            {!isConsuladosDepartmentView ? (
-              <button
-                onClick={openConsuladosView}
-                className="rounded-lg border border-blue-200 bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50"
-              >
-                Ver Consulados
-              </button>
-            ) : (
-              <div className="w-80 rounded-xl border border-blue-100 bg-white p-4 shadow-lg">
-                <div className="mb-2 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-blue-600">
-                      Departamento especial
-                    </p>
-                    <p className="text-sm font-semibold text-slate-800">
-                      Consulados (88)
-                    </p>
-                  </div>
-                  <button
-                    onClick={closeConsuladosView}
-                    className="text-xs font-medium text-blue-700 hover:text-blue-900"
-                  >
-                    Cerrar
-                  </button>
-                </div>
-
-                <label className="mb-1 block text-xs font-medium text-slate-600">
-                  País (municipio)
-                </label>
-                <select
-                  value={selectedMunicipioCode ?? ""}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setSelectedMunicipioCode(value || null);
-                  }}
-                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-700"
-                  disabled={consuladoMunicipiosLoading}
-                >
-                  <option value="">Todos los consulados</option>
-                  {consuladoMunicipios.map((option) => (
-                    <option key={option.code} value={option.code}>
-                      {option.name} ({option.puestosCount} puestos)
-                    </option>
-                  ))}
-                </select>
-
-                {consuladoMunicipiosLoading && (
-                  <p className="mt-2 text-xs text-slate-500">
-                    Cargando países de consulados…
-                  </p>
-                )}
-
-                {!consuladoMunicipiosLoading &&
-                  consuladoMunicipios.length === 0 && (
-                    <p className="mt-2 text-xs text-slate-500">
-                      No hay municipios de consulados disponibles.
-                    </p>
-                  )}
-              </div>
-            )}
-          </div>
-
-          {loading && (
-            <div className="pointer-events-none absolute left-4 top-4 z-[1000]">
-              <div className="flex items-center gap-3 rounded-full border border-blue-100 bg-white/95 px-4 py-2 shadow-lg backdrop-blur-sm">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600/30 border-t-blue-600" />
-                <div className="flex flex-col leading-tight">
-                  <span className="text-sm font-semibold text-slate-800">
-                    Cargando mapa
-                  </span>
-                  <span className="text-xs text-slate-500">{loadingLabel}</span>
-                </div>
+  const consuladosControl = (
+    <div className="absolute left-3 top-3 z-[1000]">
+      {!isConsuladosDepartmentView ? (
+        <button
+          type="button"
+          onClick={openConsuladosView}
+          className="inline-flex items-center gap-1.5 rounded-lg border bg-white px-3 py-2 text-xs font-semibold shadow-sm transition-colors hover:bg-slate-50"
+          style={{ borderColor: 'var(--civ-border)', color: 'var(--civ-primary)' }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="2" y1="12" x2="22" y2="12" />
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+          </svg>
+          Consulados
+        </button>
+      ) : (
+        <div
+          className="w-72 rounded-lg border bg-white p-3 shadow-md"
+          style={{ borderColor: 'var(--civ-border)' }}
+        >
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="civ-eyebrow">Departamento especial</div>
+              <div className="truncate" style={{ fontSize: 13, fontWeight: 600, color: 'var(--civ-text)' }}>
+                Consulados (88)
               </div>
             </div>
-          )}
-
-          <MapContainer
-            center={center}
-            zoom={zoom}
-            className="h-full w-full"
-            zoomControl={false}
-            zoomDelta={0.5}
-            zoomSnap={0.1}
-            attributionControl={false}
-            maxBounds={COLOMBIA_BOUNDS}
-            maxBoundsViscosity={1.0}
-            minZoom={5}
-          >
-            <ZoomControl position="topright" />
-            <MapController
-              center={center}
-              zoom={zoom}
-              selectedDepartmentCode={selectedDepartmentCode}
-              selectedMunicipioCode={selectedMunicipioCode}
-              displayDepartmentGeoJSON={displayDepartamentosGeoJSON}
-              rawDepartmentGeoJSON={departamentosGeoJSON}
-              municipiosGeoJSON={municipiosGeoJSON}
-              isInDepartmentView={
-                currentJurisdiccion?.layer === "departamentos"
-              }
-              isConsuladosDepartmentView={isConsuladosDepartmentView}
-              selectedZoneId={selectedZoneId}
-              zoneByDepartmentCode={zoneByDepartmentCode}
-            />
-
-            {currentJurisdiccion &&
-              ["pais", "zonas"].includes(currentJurisdiccion.layer) &&
-              displayDepartamentosGeoJSON && (
-                <GeoJSON
-                  key={`depts-${currentJurisdiccion.id}-${zoneByDepartmentCode.size}`}
-                  data={displayDepartamentosGeoJSON}
-                  style={getDepartmentStyle}
-                  onEachFeature={onEachFeature}
-                />
-              )}
-
-            {currentJurisdiccion?.layer === "departamentos" &&
-              municipiosGeoJSON && (
-                <GeoJSON
-                  key={selectedDepartmentCode ?? "none"}
-                  ref={(r: any) => {
-                    municipiosLayerRef.current = r;
-                  }}
-                  data={municipiosGeoJSON}
-                  style={municipioStyle}
-                  interactive={true}
-                  onEachFeature={onEachMunicipioFeature}
-                />
-              )}
-
-            {puestos.map((puesto) => (
-              <Marker
-                key={puesto.codigo_puesto}
-                position={[puesto.latitud, puesto.longitud]}
-                eventHandlers={{
-                  click: () => setSelectedPuesto(puesto),
-                }}
-              >
-                <Popup>
-                  <div className="text-sm">
-                    <div className="font-bold">{puesto.puesto}</div>
-                    <div className="text-xs text-gray-600">
-                      {puesto.codigo_puesto}
-                    </div>
-                    {puesto.direccion && (
-                      <div className="text-xs mt-1">{puesto.direccion}</div>
-                    )}
-                    {puesto.mesas && (
-                      <div className="text-xs mt-1">Mesas: {puesto.mesas}</div>
-                    )}
-                    {puesto.total && (
-                      <div className="text-xs">
-                        Potencial: {puesto.total.toLocaleString()}
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => usePuestoModalStore.getState().open(puesto)}
-                      className="mt-2 inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-700"
-                    >
-                      Ver detalle
-                    </button>
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
-          </MapContainer>
-        </section>
-
-        <div ref={panelRef} className="min-h-0 overflow-auto border-l border-[var(--civ-border)] p-3 lg:p-4">
-          <MapInfoRail
-            currentJurisdiccion={currentJurisdiccion}
-            activeView={activeView}
-            selectedYear={selectedYear}
-            selectedPuesto={selectedPuesto}
-            selectedPuestoTerritory={selectedPuestoTerritory}
-            territorioStats={territorioStats}
-            territorioStatsLoading={territorioStatsLoading}
-            territorioStatsError={territorioStatsError}
-            territorioTipo={territorioTipo}
-            selectedTerritoryName={selectedTerritoryName}
-            selectedTerritoryCode={selectedTerritory?.canonicalId ?? null}
-            selectedTerritoryIntegrityError={selectedTerritoryIntegrityError}
-            onClosePuesto={() => setSelectedPuesto(null)}
-            onCloseTerritorio={() => {
-              setTerritorioStats(null);
-              setTerritorioStatsError(false);
+            <button
+              type="button"
+              onClick={closeConsuladosView}
+              className="shrink-0 text-xs font-medium hover:underline"
+              style={{ color: 'var(--civ-primary)' }}
+            >
+              Cerrar
+            </button>
+          </div>
+          <label className="mb-1 block" style={{ fontSize: 11, fontWeight: 600, color: 'var(--civ-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            País
+          </label>
+          <select
+            value={selectedMunicipioCode ?? ''}
+            onChange={(event) => {
+              const value = event.target.value;
+              setSelectedMunicipioCode(value || null);
             }}
-          />
+            className="w-full rounded-md border bg-white px-2 py-1.5 text-sm"
+            style={{ borderColor: 'var(--civ-border)', color: 'var(--civ-text)' }}
+            disabled={consuladoMunicipiosLoading}
+          >
+            <option value="">Todos los consulados</option>
+            {consuladoMunicipios.map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.name} ({option.puestosCount} puestos)
+              </option>
+            ))}
+          </select>
+          {consuladoMunicipiosLoading && (
+            <p className="mt-2" style={{ fontSize: 11, color: 'var(--civ-text-muted)' }}>
+              Cargando países de consulados…
+            </p>
+          )}
+          {!consuladoMunicipiosLoading && consuladoMunicipios.length === 0 && (
+            <p className="mt-2" style={{ fontSize: 11, color: 'var(--civ-text-muted)' }}>
+              No hay municipios de consulados disponibles.
+            </p>
+          )}
         </div>
+      )}
+    </div>
+  );
+
+  const loadingPill = loading && (
+    <div className="pointer-events-none absolute right-3 top-3 z-[1000]">
+      <div
+        className="flex items-center gap-2 rounded-full border bg-white/95 px-3 py-1.5 shadow-md backdrop-blur-sm"
+        style={{ borderColor: 'var(--civ-border)' }}
+      >
+        <div
+          className="h-3.5 w-3.5 animate-spin rounded-full border-2"
+          style={{ borderColor: 'var(--civ-primary-soft)', borderTopColor: 'var(--civ-primary)' }}
+        />
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--civ-text)' }}>{loadingLabel}</span>
       </div>
+    </div>
+  );
+
+  const mapContainer = (
+    <MapContainer
+      center={center}
+      zoom={zoom}
+      className="h-full w-full"
+      zoomControl={false}
+      zoomDelta={0.5}
+      zoomSnap={0.1}
+      attributionControl={false}
+      maxBounds={COLOMBIA_BOUNDS}
+      maxBoundsViscosity={1.0}
+      minZoom={5}
+    >
+      <ZoomControl position="topright" />
+      <MapController
+        center={center}
+        zoom={zoom}
+        selectedDepartmentCode={selectedDepartmentCode}
+        selectedMunicipioCode={selectedMunicipioCode}
+        displayDepartmentGeoJSON={displayDepartamentosGeoJSON}
+        rawDepartmentGeoJSON={departamentosGeoJSON}
+        municipiosGeoJSON={municipiosGeoJSON}
+        isInDepartmentView={currentJurisdiccion?.layer === "departamentos"}
+        isConsuladosDepartmentView={isConsuladosDepartmentView}
+        selectedZoneId={selectedZoneId}
+        zoneByDepartmentCode={zoneByDepartmentCode}
+      />
+
+      {currentJurisdiccion &&
+        ["pais", "zonas"].includes(currentJurisdiccion.layer) &&
+        displayDepartamentosGeoJSON && (
+          <GeoJSON
+            key={`depts-${currentJurisdiccion.id}-${zoneByDepartmentCode.size}`}
+            data={displayDepartamentosGeoJSON}
+            style={getDepartmentStyle}
+            onEachFeature={onEachFeature}
+          />
+        )}
+
+      {currentJurisdiccion?.layer === "departamentos" &&
+        municipiosGeoJSON && (
+          <GeoJSON
+            key={selectedDepartmentCode ?? "none"}
+            ref={(r: any) => {
+              municipiosLayerRef.current = r;
+            }}
+            data={municipiosGeoJSON}
+            style={municipioStyle}
+            interactive={true}
+            onEachFeature={onEachMunicipioFeature}
+          />
+        )}
+
+      {puestos.map((puesto) => (
+        <Marker
+          key={puesto.codigo_puesto}
+          position={[puesto.latitud, puesto.longitud]}
+        >
+          <Popup>
+            <div className="text-sm">
+              <div className="font-bold">{puesto.puesto}</div>
+              <div className="text-xs text-gray-600">{puesto.codigo_puesto}</div>
+              {puesto.direccion && <div className="text-xs mt-1">{puesto.direccion}</div>}
+              {puesto.mesas && <div className="text-xs mt-1">Mesas: {puesto.mesas}</div>}
+              {puesto.total && (
+                <div className="text-xs">Potencial: {puesto.total.toLocaleString()}</div>
+              )}
+              <button
+                type="button"
+                onClick={() => usePuestoModalStore.getState().open(puesto)}
+                className="mt-2 inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-700"
+              >
+                Ver detalle
+              </button>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+    </MapContainer>
+  );
+
+  return (
+    <div className="relative h-full w-full bg-white">
+      {consuladosControl}
+      {loadingPill}
+      {mapContainer}
     </div>
   );
 }

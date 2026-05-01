@@ -91,12 +91,12 @@ export function SearchBar() {
           navigateTo(zone);
           navigateTo(catalogDept);
           setSelectedMunicipioCode(municipioCode, result.name);
-          navigate(`${viewPath}/${zoneCode}/${catalogDept.code}/${municipioCode}`);
+          navigate(`${viewPath}/${zoneCode}/${catalogDept.code}/${municipioCode}${location.search}`);
         } else {
           // Fallback: dept not in catalog — navigate by URL only; Zustand update is
           // intentionally omitted here because useRouteSync will reconstruct the full
           // navigationStack (zone + dept + muni) on the next render from the new URL.
-          navigate(`${viewPath}/${parentDepartmentCode}`);
+          navigate(`${viewPath}/${parentDepartmentCode}${location.search}`);
         }
       } else if (result.type === "departamento") {
         reset();
@@ -119,10 +119,10 @@ export function SearchBar() {
           navigateTo(zone);
           navigateTo(catalogDept);
           setSelectedMunicipioCode(null);
-          navigate(`${viewPath}/${zoneCode}/${catalogDept.code}`);
+          navigate(`${viewPath}/${zoneCode}/${catalogDept.code}${location.search}`);
         } else {
           // Fallback: not in catalog, let useRouteSync reconstruct from URL
-          navigate(`${viewPath}/${result.code}`);
+          navigate(`${viewPath}/${result.code}${location.search}`);
         }
       }
     } finally {

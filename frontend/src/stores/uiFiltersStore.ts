@@ -1,7 +1,7 @@
 import { create } from 'zustand';
+import { useNavigationStore } from './navigationStore';
 
 export type Modulo = 'resultados' | 'puestos' | 'jurados-testigos';
-export type Nivel = 'departamentos' | 'municipio';
 export type ActiveTab = 'dashboard' | 'mapa' | 'reportes' | 'comparador';
 
 export interface EleccionKey {
@@ -15,49 +15,62 @@ interface UIFiltersStore {
   anio: number;
   corporacion: string;
   candidatoFiltro: string | null;
-  nivel: Nivel;
+  partidoFiltro: string | null;
   searchQuery: string;
   activeTab: ActiveTab;
 
   setModulo: (modulo: Modulo) => void;
   setEleccion: (key: EleccionKey) => void;
   setCandidatoFiltro: (id: string | null) => void;
-  setNivel: (nivel: Nivel) => void;
+  setPartidoFiltro: (id: string | null) => void;
   setSearchQuery: (q: string) => void;
   setActiveTab: (tab: ActiveTab) => void;
 }
 
-export const useUIFiltersStore = create<UIFiltersStore>((set) => ({
-  modulo: 'resultados',
-  anio: 2022,
-  corporacion: 'P01',
-  candidatoFiltro: null,
-  nivel: 'departamentos',
+// Default = Senado 2026 (most recent loaded data per project_overview).
+export const DEFAULT_FILTERS = {
+  modulo: 'resultados' as Modulo,
+  anio: 2026,
+  corporacion: '001',
+  candidatoFiltro: null as string | null,
+  partidoFiltro: null as string | null,
   searchQuery: '',
-  activeTab: 'mapa',
+  activeTab: 'mapa' as ActiveTab,
+};
 
-  setModulo: (modulo) =>
-    set((state) => ({
+export const useUIFiltersStore = create<UIFiltersStore>((set) => ({
+  ...DEFAULT_FILTERS,
+
+  setModulo: (modulo) => {
+    useNavigationStore.getState().reset();
+    set({
       modulo,
       activeTab: 'mapa',
-      candidatoFiltro: modulo === 'resultados' ? state.candidatoFiltro : null,
-    })),
+      candidatoFiltro: null,
+      partidoFiltro: null,
+      searchQuery: '',
+    });
+  },
 
-  setEleccion: ({ modulo, anio, corporacion }) =>
+  setEleccion: ({ modulo, anio, corporacion }) => {
+    useNavigationStore.getState().reset();
     set((state) => {
-      // If switching away from resultados, comparador tab is no longer available
       const tabStillValid = !(state.activeTab === 'comparador' && modulo !== 'resultados');
       return {
         modulo,
         anio,
         corporacion,
         candidatoFiltro: null,
+        partidoFiltro: null,
+        searchQuery: '',
         activeTab: tabStillValid ? state.activeTab : 'mapa',
       };
-    }),
+    });
+  },
 
   setCandidatoFiltro: (candidatoFiltro) => set({ candidatoFiltro }),
-  setNivel: (nivel) => set({ nivel }),
+  // Changing partido clears candidato (candidato dropdown is scoped to selected partido)
+  setPartidoFiltro: (partidoFiltro) => set({ partidoFiltro, candidatoFiltro: null }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setActiveTab: (activeTab) => set({ activeTab }),
 }));

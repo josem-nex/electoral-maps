@@ -60,7 +60,10 @@ function ComparatorSide({ label, eleccion, onChange }: ComparatorSideProps) {
 
   return (
     <div className="civ-card">
-      <div className="flex items-center justify-between" style={{ padding: '12px 18px', borderBottom: '1px solid var(--civ-border)' }}>
+      <div
+        className="flex items-center justify-between gap-3"
+        style={{ padding: '12px 18px', borderBottom: '1px solid var(--civ-border)' }}
+      >
         <div className="civ-eyebrow">Lado {label}</div>
         <select
           value={eleccion.id}
@@ -68,7 +71,17 @@ function ComparatorSide({ label, eleccion, onChange }: ComparatorSideProps) {
             const opt = RESULTADOS_OPTS.find((o) => o.id === e.target.value);
             if (opt) onChange(opt);
           }}
-          className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          style={{
+            height: 34,
+            padding: '0 10px',
+            border: '1px solid var(--civ-border)',
+            borderRadius: 8,
+            background: '#fff',
+            fontSize: 13,
+            color: 'var(--civ-text)',
+            outline: 'none',
+            cursor: 'pointer',
+          }}
         >
           {RESULTADOS_OPTS.map((o) => (
             <option key={o.id} value={o.id}>{o.label}</option>
@@ -76,24 +89,58 @@ function ComparatorSide({ label, eleccion, onChange }: ComparatorSideProps) {
         </select>
       </div>
 
-      <div className="p-4">
-        {error && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
-        {loading && !data && <div className="py-8 text-center text-slate-500">Cargando…</div>}
+      <div style={{ padding: 16 }}>
+        {error && (
+          <div
+            style={{
+              padding: '8px 12px',
+              borderRadius: 8,
+              border: '1px solid #fecaca',
+              background: '#fef2f2',
+              fontSize: 13,
+              color: '#b91c1c',
+            }}
+          >
+            {error}
+          </div>
+        )}
+        {loading && !data && (
+          <div className="py-8 text-center" style={{ color: 'var(--civ-text-muted)', fontSize: 13 }}>
+            Cargando…
+          </div>
+        )}
 
         {top && data && (
-          <div className="space-y-4">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <div className="text-xs uppercase tracking-wide text-slate-500">Partido más votado</div>
-              <div className="mt-1 text-lg font-semibold text-slate-900">{top.ganador.partido_nombre}</div>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-3xl font-bold tabular-nums text-blue-700">
+          <div className="flex flex-col" style={{ gap: 16 }}>
+            <div
+              style={{
+                padding: 12,
+                borderRadius: 10,
+                border: '1px solid var(--civ-border)',
+                background: 'var(--civ-primary-soft)',
+              }}
+            >
+              <div className="civ-eyebrow">Partido más votado</div>
+              <div
+                className="truncate"
+                style={{ marginTop: 4, fontSize: 16, fontWeight: 700, color: 'var(--civ-text)' }}
+              >
+                {top.ganador.partido_nombre}
+              </div>
+              <div className="flex items-baseline gap-2" style={{ marginTop: 4 }}>
+                <span
+                  className="tabular-nums"
+                  style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--civ-primary)' }}
+                >
                   {top.total > 0 ? fmtPct((top.ganador.partido_votos / top.total) * 100, 2) : '—'}
                 </span>
-                <span className="text-sm text-slate-600">· {fmt(top.ganador.partido_votos)} votos</span>
+                <span style={{ fontSize: 12, color: 'var(--civ-text-muted)' }}>
+                  · {fmt(top.ganador.partido_votos)} votos
+                </span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="grid grid-cols-2" style={{ gap: 8 }}>
               <MiniStat label="Votos válidos" value={fmt(data.votos_validos)} />
               <MiniStat
                 label="Participación"
@@ -112,17 +159,37 @@ function ComparatorSide({ label, eleccion, onChange }: ComparatorSideProps) {
             </div>
 
             <div>
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Top 5 partidos</div>
-              <div className="space-y-1.5">
+              <div className="civ-eyebrow" style={{ marginBottom: 8 }}>Top 5 partidos</div>
+              <div className="flex flex-col" style={{ gap: 6 }}>
                 {top.top5.map((p) => {
                   const pct = top.total > 0 ? (p.partido_votos / top.total) * 100 : 0;
                   return (
-                    <div key={p.partido_codigo} className="flex items-center gap-2 text-sm">
-                      <div className="flex-1 truncate text-slate-700">{p.partido_nombre}</div>
-                      <div className="relative h-2 w-24 overflow-hidden rounded-full bg-slate-100">
-                        <div className="h-full rounded-full bg-blue-600" style={{ width: `${pct}%` }} />
+                    <div key={p.partido_codigo} className="flex items-center gap-2">
+                      <div
+                        className="flex-1 truncate"
+                        style={{ fontSize: 12, color: 'var(--civ-text)', fontWeight: 600 }}
+                      >
+                        {p.partido_nombre}
                       </div>
-                      <div className="w-12 text-right font-mono text-xs text-slate-600">{fmtPct(pct, 1)}</div>
+                      <div
+                        className="relative w-24 overflow-hidden"
+                        style={{ height: 6, borderRadius: 99, background: 'var(--civ-bg)' }}
+                      >
+                        <div
+                          style={{
+                            height: '100%',
+                            width: `${pct}%`,
+                            background: 'var(--civ-primary)',
+                            borderRadius: 99,
+                          }}
+                        />
+                      </div>
+                      <div
+                        className="w-12 text-right tabular-nums"
+                        style={{ fontSize: 11, color: 'var(--civ-text-muted)' }}
+                      >
+                        {fmtPct(pct, 1)}
+                      </div>
                     </div>
                   );
                 })}

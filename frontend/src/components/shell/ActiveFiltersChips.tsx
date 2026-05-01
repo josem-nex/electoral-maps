@@ -6,13 +6,12 @@ interface ActiveFiltersChipsProps {
 }
 
 export function ActiveFiltersChips({ onOpen }: ActiveFiltersChipsProps) {
-  const { modulo, anio, corporacion, candidatoFiltro, nivel } = useUIFiltersStore();
+  const { modulo, anio, corporacion, candidatoFiltro } = useUIFiltersStore();
   const eleccion = findEleccion(modulo, anio, corporacion);
 
   const chips: string[] = [];
   if (eleccion) chips.push(eleccion.label);
   if (candidatoFiltro) chips.push('Candidato seleccionado');
-  if (nivel === 'municipio') chips.push('Municipios');
 
   return (
     <div className="flex items-center gap-2 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2 sm:hidden">

@@ -1,12 +1,15 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useNavigationStore } from '../../stores/navigationStore';
-import { Breadcrumbs } from '../Breadcrumbs';
 import { useUIFiltersStore } from '../../stores/uiFiltersStore';
 
 export function NavigationStrip() {
   const navigate = useNavigate();
-  const { navigationStack, navigateBack, reset, selectedMunicipioCode } = useNavigationStore();
-  const { modulo, anio } = useUIFiltersStore();
+  const location = useLocation();
+  const { navigationStack, selectedMunicipioCode, selectedMunicipioName } = useNavigationStore();
+  const { modulo, anio, activeTab } = useUIFiltersStore();
+
+  // Only show territorial breadcrumb on the map view; other tabs are global
+  if (activeTab !== 'mapa') return null;
 
   const hasDrillDown = navigationStack.length > 1 || !!selectedMunicipioCode;
   if (!hasDrillDown) return null;
@@ -17,21 +20,10 @@ export function NavigationStrip() {
     '/jurados-testigos';
 
   const handleHome = () => {
-    reset();
-    navigate(homePath);
+    navigate(homePath + location.search);
   };
 
   const handleBack = () => {
-    if (selectedMunicipioCode) {
-      // Clear the municipio selection (drop the leaf, stay at depto)
-      useNavigationStore.getState().setSelectedMunicipioCode(null);
-      const segments = window.location.pathname.split('/').filter(Boolean);
-      // Strip municipio segment from URL
-      const newSegments = segments.slice(0, -1);
-      navigate('/' + newSegments.join('/'));
-      return;
-    }
-    navigateBack();
     navigate(-1);
   };
 
@@ -40,8 +32,19 @@ export function NavigationStrip() {
       className="civ-card flex shrink-0 items-center justify-between"
       style={{ padding: '8px 14px', gap: 12 }}
     >
-      <div className="min-w-0 flex-1">
-        <Breadcrumbs />
+      <div className="min-w-0 flex-1 flex items-center gap-1 text-xs text-slate-500 truncate">
+        {navigationStack.map((j, i) => (
+          <span key={j.id} className="flex items-center gap-1 min-w-0">
+            {i > 0 && <span className="shrink-0 text-slate-300">/</span>}
+            <span className={i === navigationStack.length - 1 && !selectedMunicipioCode ? 'font-medium text-slate-700 truncate' : 'truncate'}>{j.name}</span>
+          </span>
+        ))}
+        {selectedMunicipioName && (
+          <span className="flex items-center gap-1 min-w-0">
+            <span className="shrink-0 text-slate-300">/</span>
+            <span className="font-medium text-slate-700 truncate">{selectedMunicipioName}</span>
+          </span>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <button

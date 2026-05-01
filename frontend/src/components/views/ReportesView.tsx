@@ -140,30 +140,55 @@ export function ReportesView() {
         </div>
 
         {/* Mobile cards */}
-        <div className="space-y-2 md:hidden">
-          {loading && <div className="py-6 text-center text-slate-500">Cargando…</div>}
+        <div className="md:hidden" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {loading && (
+            <div className="py-6 text-center" style={{ color: 'var(--civ-text-muted)' }}>Cargando…</div>
+          )}
           {!loading && rows.map((r, i) => {
             const pct = total > 0 ? (r.primary / total) * 100 : 0;
             return (
-              <div key={r.code} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+              <div
+                key={r.code}
+                className="civ-card"
+                style={{ padding: 12 }}
+              >
                 <div className="flex items-start justify-between">
-                  <div>
-                    <div className="text-xs text-slate-400">#{i + 1} · DIVIPOLA {r.code}</div>
-                    <div className="font-semibold text-slate-900">{r.name}</div>
+                  <div className="min-w-0">
+                    <div style={{ fontSize: 11, color: 'var(--civ-text-muted)' }}>
+                      #{i + 1} · DIVIPOLA {r.code}
+                    </div>
+                    <div className="truncate" style={{ fontSize: 14, fontWeight: 600, color: 'var(--civ-text)' }}>
+                      {r.name}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-lg font-bold tabular-nums text-blue-700">{fmt(r.primary)}</div>
-                    <div className="text-[11px] uppercase tracking-wide text-slate-500">{headers.primary}</div>
+                  <div className="text-right shrink-0" style={{ marginLeft: 12 }}>
+                    <div
+                      className="tabular-nums"
+                      style={{ fontSize: 18, fontWeight: 700, color: 'var(--civ-primary)' }}
+                    >
+                      {fmt(r.primary)}
+                    </div>
+                    <div className="civ-eyebrow">{headers.primary}</div>
                   </div>
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-2 border-t border-slate-100 pt-2 text-xs">
+                <div
+                  className="grid grid-cols-2"
+                  style={{
+                    gap: 8,
+                    marginTop: 8,
+                    paddingTop: 8,
+                    borderTop: '1px solid var(--civ-border)',
+                  }}
+                >
                   <div>
-                    <div className="text-slate-500">{headers.secondary}</div>
-                    <div className="font-medium text-slate-900">{r.secondary !== undefined ? fmt(r.secondary) : '—'}</div>
+                    <div className="civ-eyebrow">{headers.secondary}</div>
+                    <div className="tabular-nums" style={{ fontSize: 13, fontWeight: 500, color: 'var(--civ-text)' }}>
+                      {r.secondary !== undefined ? fmt(r.secondary) : '—'}
+                    </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-slate-500">{headers.tertiary}</div>
-                    <div className="font-medium text-slate-900">
+                    <div className="civ-eyebrow">{headers.tertiary}</div>
+                    <div className="tabular-nums" style={{ fontSize: 13, fontWeight: 500, color: 'var(--civ-text)' }}>
                       {modulo === 'puestos' && r.tertiary !== undefined ? fmt(r.tertiary) : `${pct.toFixed(2)}%`}
                     </div>
                   </div>

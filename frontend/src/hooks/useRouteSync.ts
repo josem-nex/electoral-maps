@@ -30,7 +30,6 @@ export function useRouteSync() {
 
   const {
     currentJurisdiccion,
-    navigationStack,
     selectedMunicipioCode,
     navigateTo,
     setSelectedMunicipioCode,
@@ -44,18 +43,20 @@ export function useRouteSync() {
       ? `/${segments[0]}/${segments[1] ?? ''}`
       : `/${segments[0] ?? ''}`;
 
-    // ── Case 1: No territorial params — ensure country level ──────────────────
+    // ── Case 1: No territorial params — ensure país level ─────────────────────
     if (!zoneCode) {
-      const alreadyAtRoot =
-        currentJurisdiccion?.layer === 'pais' || currentJurisdiccion?.layer === 'zonas';
-      if (!alreadyAtRoot) reset();
+      const isAtPais = currentJurisdiccion?.layer === 'pais' && !selectedMunicipioCode;
+      if (!isAtPais) reset();
       return;
     }
 
     // ── Case 2: Zone only, no dept — ensure zone level ────────────────────────
     if (zoneCode && !deptoCode) {
-      const currentZoneCode = navigationStack.find((j) => j.layer === 'zonas')?.code;
-      if (currentZoneCode === zoneCode) return; // already in sync
+      const isAtThisZone =
+        currentJurisdiccion?.layer === 'zonas' &&
+        currentJurisdiccion.code === zoneCode &&
+        !selectedMunicipioCode;
+      if (isAtThisZone) return; // already in sync
 
       // Reconstruct zone navigation from catalog
       let cancelled = false;
@@ -86,10 +87,19 @@ export function useRouteSync() {
     }
 
     // ── Case 3: Zone + dept (+ optional muni) ────────────────────────────────
-    const currentDeptCode = navigationStack.find((j) => j.layer === 'departamentos')?.code;
-    const deptMatches = currentDeptCode === deptoCode;
-    const muniMatches = !muniCode || selectedMunicipioCode === muniCode;
-    if (deptMatches && muniMatches) return; // already in sync
+    const isAtThisDept =
+      currentJurisdiccion?.layer === 'departamentos' &&
+      currentJurisdiccion.code === deptoCode;
+    const muniMatches = muniCode
+      ? selectedMunicipioCode === muniCode
+      : selectedMunicipioCode === null;
+    if (isAtThisDept && muniMatches) return; // already in sync
+
+    // If URL has no muni but store has one, clear it (back nav from muni → depto)
+    if (isAtThisDept && !muniCode && selectedMunicipioCode) {
+      setSelectedMunicipioCode(null);
+      return;
+    }
 
     // Reconstruct state from URL
     let cancelled = false;
