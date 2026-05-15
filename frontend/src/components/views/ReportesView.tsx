@@ -140,7 +140,7 @@ export function ReportesView() {
         </div>
 
         {/* Mobile cards */}
-        <div className="md:hidden" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="md:hidden flex flex-col" style={{ gap: 8 }}>
           {loading && (
             <div className="py-6 text-center" style={{ color: 'var(--civ-text-muted)' }}>Cargando…</div>
           )}
