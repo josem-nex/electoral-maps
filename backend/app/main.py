@@ -36,6 +36,7 @@ from app.db_models import (
 )
 from app.data_loader import (
     build_departamentos_catalog,
+    canonicalize_municipio_code,
     get_municipios_geojson_by_departamento,
     load_departamentos_geojson,
     normalize_codigo_territorial,
@@ -944,9 +945,16 @@ def get_municipios_geojson(
             5,
         )
 
+        # Resolución del código del muni en el catálogo del proyecto:
+        # 1) match exacto por nombre normalizado (caso simple)
+        # 2) helper compartido (lookup en territorio_municipio con strip de paréntesis
+        #    + alias overrides) — necesario porque la BD lleva nombres tipo
+        #    "PAZ DE ARIPORO (MORENO)" mientras que el topojson trae "PAZ DE ARIPORO".
+        # 3) fallback al cálculo sintético dept + DANE[-3:] (sólo edge cases).
         excel_mm = mm_by_norm_name.get(mun_norm)
-        if not excel_mm and canonical_mm:
-            excel_mm = f"{requested_dd}{canonical_mm[-3:]}"
+        if not excel_mm:
+            synthetic = f"{requested_dd}{canonical_mm[-3:]}" if canonical_mm else ""
+            excel_mm = canonicalize_municipio_code(requested_dd, mun_name, synthetic) or synthetic
 
         if excel_mm:
             props["excel_id"] = excel_mm
