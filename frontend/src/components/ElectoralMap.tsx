@@ -154,6 +154,7 @@ function MapController({
     } as any);
     const bounds = geoJsonLayer.getBounds();
     if (bounds.isValid()) {
+      map.invalidateSize();
       map.setMaxBounds(null as any);
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: ZONE_FIT_MAX_ZOOM });
       const colombiaBounds = L.latLngBounds(
@@ -182,11 +183,10 @@ function MapController({
       const bounds = geoJsonLayer.getBounds();
       if (bounds.isValid()) {
         const center = bounds.getCenter();
-        if (!isLikelyColombiaCenter(center.lat, center.lng)) {
-          return;
-        }
+        if (!isLikelyColombiaCenter(center.lat, center.lng)) return;
         // Temporarily lift maxBounds so fitBounds is never clipped for
         // departments near Colombia's borders (e.g. Amazonas, Nariño, Guajira).
+        map.invalidateSize();
         map.setMaxBounds(null as any);
         map.fitBounds(bounds, {
           padding: [20, 20],
@@ -225,9 +225,12 @@ function MapController({
       const bounds = geoJsonLayer.getBounds();
       if (bounds.isValid()) {
         const center = bounds.getCenter();
-        if (!isLikelyColombiaCenter(center.lat, center.lng)) {
-          return;
-        }
+        if (!isLikelyColombiaCenter(center.lat, center.lng)) return;
+        // invalidateSize() syncs Leaflet's internal size with the actual DOM
+        // container size (which may have changed when NavigationStrip appeared
+        // or other layout shifts happened). Without this, fitBounds calculates
+        // zoom based on a stale container size and the map doesn't move.
+        map.invalidateSize();
         // Same border-clipping fix as for departments.
         map.setMaxBounds(null as any);
         map.fitBounds(bounds, {
