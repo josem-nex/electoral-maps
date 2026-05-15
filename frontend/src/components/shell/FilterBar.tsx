@@ -21,22 +21,30 @@ const FIELD_LABEL: React.CSSProperties = {
 
 /** Filter fields without the bar wrapper — reused inside the desktop bar and the mobile drawer. */
 export function FilterFields({ layout = 'horizontal' }: FilterFieldsProps) {
-  const { modulo, corporacion } = useUIFiltersStore();
+  const { modulo, corporacion, activeTab } = useUIFiltersStore();
   const showResultsFilters = modulo === 'resultados';
   const isPresidencial = corporacion === 'P01' || corporacion === 'P02';
-  // Presidencial: only candidato. Otherwise: partido + candidato (filtered by partido).
-  const showPartido = showResultsFilters && !isPresidencial;
+  // Tab-based visibility:
+  //   mapa       → Partido + Candidato + Buscar (per módulo applicability)
+  //   comparador → solo Partido (filtra ambos lados de la comparación)
+  //   dashboard  → ningún filtro de partido/candidato/buscar
+  //   reportes   → ningún filtro de partido/candidato/buscar
+  const partidoAllowedByTab = activeTab === 'mapa' || activeTab === 'comparador';
+  const candidatoAllowedByTab = activeTab === 'mapa';
+  const showPartido = showResultsFilters && !isPresidencial && partidoAllowedByTab;
+  const showCandidato = showResultsFilters && candidatoAllowedByTab;
+  const showBuscar = activeTab === 'mapa';
   const showJuradosManage = modulo === 'jurados-testigos';
   const [juradosOpen, setJuradosOpen] = useState(false);
 
   const stacked = layout === 'stacked';
 
-  // Tipo (1.4) · [Partido 1.2] · [Candidato 1.4] · Search (2) · [Personal auto]
+  // Tipo (1.4) · [Partido 1.2] · [Candidato 1.4] · [Search 2] · [Personal auto]
   const cols: string[] = [];
   cols.push('1.4fr'); // Tipo
   if (showPartido) cols.push('1.2fr'); // Partido
-  if (showResultsFilters) cols.push('1.4fr'); // Candidato
-  cols.push('2fr'); // Buscar
+  if (showCandidato) cols.push('1.4fr'); // Candidato
+  if (showBuscar) cols.push('2fr'); // Buscar
   if (showJuradosManage) cols.push('auto'); // Personal
   const gridTemplate = stacked ? '1fr' : cols.join(' ');
 
@@ -61,17 +69,19 @@ export function FilterFields({ layout = 'horizontal' }: FilterFieldsProps) {
         </div>
       )}
 
-      {showResultsFilters && (
+      {showCandidato && (
         <div className="min-w-0">
           <label style={FIELD_LABEL}>Candidato</label>
           <CandidatoSelect />
         </div>
       )}
 
-      <div className="min-w-0">
-        <label style={FIELD_LABEL}>Buscar</label>
-        <SearchBar />
-      </div>
+      {showBuscar && (
+        <div className="min-w-0">
+          <label style={FIELD_LABEL}>Buscar</label>
+          <SearchBar />
+        </div>
+      )}
 
       {showJuradosManage && (
         <div className="min-w-0">

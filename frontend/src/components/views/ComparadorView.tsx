@@ -35,6 +35,7 @@ interface ComparatorSideProps {
 }
 
 function ComparatorSide({ label, eleccion, onChange }: ComparatorSideProps) {
+  const partidoFiltro = useUIFiltersStore((s) => s.partidoFiltro);
   const [data, setData] = useState<ResultadosElectorales | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +57,13 @@ function ComparatorSide({ label, eleccion, onChange }: ComparatorSideProps) {
     const total = sorted.reduce((s, p) => s + p.partido_votos, 0);
     return { ganador: sorted[0], top5: sorted.slice(0, 5), total };
   }, [data]);
+
+  // Cuando hay un partido filtrado, intentar destacar sus stats en este lado.
+  // Si no compitió en esta elección, partidoSelected = null y se muestra mensaje.
+  const partidoSelected = useMemo(() => {
+    if (!partidoFiltro || !data || !top) return null;
+    return data.partidos.find((p) => p.partido_codigo === partidoFiltro) ?? null;
+  }, [partidoFiltro, data, top]);
 
   return (
     <div className="civ-card">
@@ -116,33 +124,78 @@ function ComparatorSide({ label, eleccion, onChange }: ComparatorSideProps) {
 
         {top && data && (
           <div className="flex flex-col" style={{ gap: 16 }}>
-            <div
-              style={{
-                padding: 12,
-                borderRadius: 10,
-                border: '1px solid var(--civ-border)',
-                background: 'var(--civ-primary-soft)',
-              }}
-            >
-              <div className="civ-eyebrow">Partido más votado</div>
-              <div
-                className="truncate"
-                style={{ marginTop: 4, fontSize: 16, fontWeight: 700, color: 'var(--civ-text)' }}
-              >
-                {top.ganador.partido_nombre}
-              </div>
-              <div className="flex items-baseline gap-2" style={{ marginTop: 4 }}>
-                <span
-                  className="tabular-nums"
-                  style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--civ-primary)' }}
+            {partidoFiltro ? (
+              partidoSelected ? (
+                <div
+                  style={{
+                    padding: 12,
+                    borderRadius: 10,
+                    border: '1px solid var(--civ-border)',
+                    background: 'var(--civ-primary-soft)',
+                  }}
                 >
-                  {top.total > 0 ? fmtPct((top.ganador.partido_votos / top.total) * 100, 2) : '—'}
-                </span>
-                <span style={{ fontSize: 12, color: 'var(--civ-text-muted)' }}>
-                  · {fmt(top.ganador.partido_votos)} votos
-                </span>
+                  <div className="civ-eyebrow">Partido seleccionado</div>
+                  <div
+                    className="truncate"
+                    style={{ marginTop: 4, fontSize: 16, fontWeight: 700, color: 'var(--civ-text)' }}
+                  >
+                    {partidoSelected.partido_nombre}
+                  </div>
+                  <div className="flex items-baseline gap-2" style={{ marginTop: 4 }}>
+                    <span
+                      className="tabular-nums"
+                      style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--civ-primary)' }}
+                    >
+                      {top.total > 0 ? fmtPct((partidoSelected.partido_votos / top.total) * 100, 2) : '—'}
+                    </span>
+                    <span style={{ fontSize: 12, color: 'var(--civ-text-muted)' }}>
+                      · {fmt(partidoSelected.partido_votos)} votos
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    padding: 12,
+                    borderRadius: 10,
+                    border: '1px dashed var(--civ-border)',
+                    background: 'var(--civ-bg)',
+                    fontSize: 13,
+                    color: 'var(--civ-text-muted)',
+                  }}
+                >
+                  El partido seleccionado no compitió en esta elección.
+                </div>
+              )
+            ) : (
+              <div
+                style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  border: '1px solid var(--civ-border)',
+                  background: 'var(--civ-primary-soft)',
+                }}
+              >
+                <div className="civ-eyebrow">Partido más votado</div>
+                <div
+                  className="truncate"
+                  style={{ marginTop: 4, fontSize: 16, fontWeight: 700, color: 'var(--civ-text)' }}
+                >
+                  {top.ganador.partido_nombre}
+                </div>
+                <div className="flex items-baseline gap-2" style={{ marginTop: 4 }}>
+                  <span
+                    className="tabular-nums"
+                    style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--civ-primary)' }}
+                  >
+                    {top.total > 0 ? fmtPct((top.ganador.partido_votos / top.total) * 100, 2) : '—'}
+                  </span>
+                  <span style={{ fontSize: 12, color: 'var(--civ-text-muted)' }}>
+                    · {fmt(top.ganador.partido_votos)} votos
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-2" style={{ gap: 8 }}>
               <MiniStat label="Votos válidos" value={fmt(data.votos_validos)} />
