@@ -11,9 +11,13 @@ import pandas as pd
 try:
     from app.config import settings
     from app.models import ElectoralLayer, Jurisdiccion, PuestoElectoral
+    from app.database import SessionLocal
+    from app.db_models import TerritorioMunicipioORM
 except ModuleNotFoundError:
     from config import settings
     from models import ElectoralLayer, Jurisdiccion, PuestoElectoral
+    from database import SessionLocal
+    from db_models import TerritorioMunicipioORM
 
 
 DEPARTMENT_ALIASES = {
@@ -69,6 +73,77 @@ def canonical_department_code_by_norm_name() -> dict[str, str]:
             mapping[norm_name] = code
 
     return mapping
+
+
+def _strip_paren_suffix(name: str) -> str:
+    """Quita sufijos entre paréntesis del nombre (ej. cabecera/centro poblado).
+
+    El catálogo `territorio_municipio` lleva nombres tipo "PAZ DE ARIPORO (MORENO)"
+    donde el paréntesis indica la cabecera. El topojson DANE solo trae el nombre
+    base ("PAZ DE ARIPORO"), así que para reconciliar buscamos por ambos: nombre
+    completo y nombre sin paréntesis.
+    """
+    return re.sub(r"\s*\([^)]*\)\s*", " ", str(name or "")).strip()
+
+
+@lru_cache(maxsize=1)
+def canonical_municipio_code_by_dept_and_norm_name() -> dict[tuple[str, str], str]:
+    """Mapping {(dept_codigo_proyecto, nombre_normalizado) -> mun_codigo_proyecto}.
+
+    Lee la fuente de verdad (`territorio_municipio` en BD) y construye un índice
+    por (departamento del proyecto, nombre normalizado). Para cada municipio se
+    indexa con dos claves: el nombre tal cual y el nombre sin sufijo en paréntesis,
+    permitiendo reconciliar el código sintético construido en
+    `get_municipios_geojson_by_departamento` con el código real cuando los
+    sufijos numéricos del topojson DANE no coinciden con los códigos del proyecto.
+
+    El primer registro insertado por clave gana (en caso de homónimos dentro del
+    mismo departamento, escenario raro).
+    """
+    db = SessionLocal()
+    try:
+        rows = db.query(
+            TerritorioMunicipioORM.codigo,
+            TerritorioMunicipioORM.nombre,
+            TerritorioMunicipioORM.departamento_codigo,
+        ).all()
+    finally:
+        db.close()
+
+    mapping: dict[tuple[str, str], str] = {}
+    for codigo, nombre, dep in rows:
+        full_norm = normalize_text(nombre)
+        clean_norm = normalize_text(_strip_paren_suffix(nombre))
+        for key in {(dep, full_norm), (dep, clean_norm)}:
+            if key[1] and key not in mapping:
+                mapping[key] = codigo
+    return mapping
+
+
+def canonicalize_municipio_code(
+    dept_codigo_proyecto: str,
+    raw_name: Any,
+    fallback: str,
+) -> str:
+    """Resuelve el código de municipio del proyecto vía nombre normalizado.
+
+    El topojson DANE usa códigos como `85250` (Paz de Ariporo). El proyecto usa
+    códigos derivados de la Registraduría/MMV (`46680` para el mismo municipio).
+    El cálculo sintético `dept + DANE[-3:]` falla en ~94% de los munis. Esta
+    función hace lookup por nombre normalizado en `territorio_municipio` y, si
+    encuentra match, devuelve el código real; si no, devuelve el `fallback`
+    (sintético) para preservar el comportamiento previo en edge cases.
+    """
+    if not dept_codigo_proyecto or not raw_name:
+        return fallback
+    name_full = normalize_text(raw_name)
+    name_clean = normalize_text(_strip_paren_suffix(raw_name))
+    mapping = canonical_municipio_code_by_dept_and_norm_name()
+    return (
+        mapping.get((dept_codigo_proyecto, name_full))
+        or mapping.get((dept_codigo_proyecto, name_clean))
+        or fallback
+    )
 
 
 def canonicalize_department_code(raw_code: Any, raw_name: Any) -> str:
@@ -296,6 +371,13 @@ def get_municipios_geojson_by_departamento(departamento_codigo: str) -> dict:
             or properties.get("nombre")
             or ""
         ).strip()
+
+        # Reconcilia el código sintético (sufijo DANE sobre prefijo de proyecto) con
+        # el código real del proyecto vía lookup por nombre en territorio_municipio.
+        # Sin esto, ~94% de los municipios devuelven datos vacíos al hacer click
+        # (los sufijos numéricos DANE no coinciden con los del proyecto, y en
+        # algunos casos chocan con OTRO muni del mismo departamento).
+        municipio_code = canonicalize_municipio_code(dept_code, municipio_name, municipio_code)
 
         properties["DPTO"] = dept_code
         properties["DPTO_CCDGO"] = dept_code
