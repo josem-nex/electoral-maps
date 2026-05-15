@@ -10,18 +10,32 @@ const fmtPct = (n: number, d = 2) => `${n.toFixed(d)}%`;
 const RESULTADOS_OPTS: EleccionOption[] = ELECCIONES_FLAT.filter((o) => o.modulo === 'resultados');
 
 export function ComparadorView() {
-  const { anio, corporacion } = useUIFiltersStore();
-  const initialA = ELECCIONES_FLAT.find((o) => o.modulo === 'resultados' && o.anio === anio && o.corporacion === corporacion)
-    ?? RESULTADOS_OPTS[0];
-  const initialB = RESULTADOS_OPTS.find((o) => o.id !== initialA?.id) ?? RESULTADOS_OPTS[1];
+  const anio = useUIFiltersStore((s) => s.anio);
+  const corporacion = useUIFiltersStore((s) => s.corporacion);
 
-  const [sideA, setSideA] = useState<EleccionOption>(initialA);
+  // Lado A está enlazado al estado global (modulo/anio/corporacion). Cambiar el
+  // lado A actualiza el store para que al volver a otros tabs se respete la
+  // elección. No usamos setEleccion para evitar limpiar partidoFiltro y resetear
+  // navegación — el comparador no tiene navegación territorial.
+  const sideA = ELECCIONES_FLAT.find(
+    (o) => o.modulo === 'resultados' && o.anio === anio && o.corporacion === corporacion,
+  ) ?? RESULTADOS_OPTS[0];
+  const handleChangeA = (opt: EleccionOption) => {
+    useUIFiltersStore.setState({
+      modulo: opt.modulo,
+      anio: opt.anio,
+      corporacion: opt.corporacion,
+    });
+  };
+
+  // Lado B es local: independiente del store.
+  const initialB = RESULTADOS_OPTS.find((o) => o.id !== sideA.id) ?? RESULTADOS_OPTS[1];
   const [sideB, setSideB] = useState<EleccionOption>(initialB);
 
   return (
     <div className="w-full">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <ComparatorSide label="A" eleccion={sideA} onChange={setSideA} />
+        <ComparatorSide label="A" eleccion={sideA} onChange={handleChangeA} />
         <ComparatorSide label="B" eleccion={sideB} onChange={setSideB} />
       </div>
     </div>
@@ -215,43 +229,90 @@ function ComparatorSide({ label, eleccion, onChange }: ComparatorSideProps) {
               />
             </div>
 
-            <div>
-              <div className="civ-eyebrow" style={{ marginBottom: 8 }}>Top 5 partidos</div>
-              <div className="flex flex-col" style={{ gap: 6 }}>
-                {top.top5.map((p) => {
-                  const pct = top.total > 0 ? (p.partido_votos / top.total) * 100 : 0;
-                  return (
-                    <div key={p.partido_codigo} className="flex items-center gap-2">
-                      <div
-                        className="flex-1 truncate"
-                        style={{ fontSize: 12, color: 'var(--civ-text)', fontWeight: 600 }}
-                      >
-                        {p.partido_nombre}
-                      </div>
-                      <div
-                        className="relative w-24 overflow-hidden"
-                        style={{ height: 6, borderRadius: 99, background: 'var(--civ-bg)' }}
-                      >
+            {partidoSelected && partidoSelected.top5_candidatos.length > 0 ? (
+              <div>
+                <div className="civ-eyebrow" style={{ marginBottom: 8 }}>
+                  Top 5 candidatos · {partidoSelected.partido_nombre}
+                </div>
+                <div className="flex flex-col" style={{ gap: 6 }}>
+                  {partidoSelected.top5_candidatos.map((c) => {
+                    const pct =
+                      partidoSelected.partido_votos > 0
+                        ? (c.votos / partidoSelected.partido_votos) * 100
+                        : 0;
+                    return (
+                      <div key={c.codigo} className="flex items-center gap-2">
                         <div
-                          style={{
-                            height: '100%',
-                            width: `${pct}%`,
-                            background: 'var(--civ-primary)',
-                            borderRadius: 99,
-                          }}
-                        />
+                          className="flex-1 truncate"
+                          style={{ fontSize: 12, color: 'var(--civ-text)', fontWeight: 600 }}
+                        >
+                          {c.nombre}
+                        </div>
+                        <div
+                          className="relative w-24 overflow-hidden"
+                          style={{ height: 6, borderRadius: 99, background: 'var(--civ-bg)' }}
+                        >
+                          <div
+                            style={{
+                              height: '100%',
+                              width: `${pct}%`,
+                              background: 'var(--civ-primary)',
+                              borderRadius: 99,
+                            }}
+                          />
+                        </div>
+                        <div
+                          className="w-20 text-right tabular-nums"
+                          style={{ fontSize: 11, color: 'var(--civ-text-muted)' }}
+                        >
+                          {fmt(c.votos)}
+                        </div>
                       </div>
-                      <div
-                        className="w-12 text-right tabular-nums"
-                        style={{ fontSize: 11, color: 'var(--civ-text-muted)' }}
-                      >
-                        {fmtPct(pct, 1)}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            ) : (
+              !partidoFiltro && (
+                <div>
+                  <div className="civ-eyebrow" style={{ marginBottom: 8 }}>Top 5 partidos</div>
+                  <div className="flex flex-col" style={{ gap: 6 }}>
+                    {top.top5.map((p) => {
+                      const pct = top.total > 0 ? (p.partido_votos / top.total) * 100 : 0;
+                      return (
+                        <div key={p.partido_codigo} className="flex items-center gap-2">
+                          <div
+                            className="flex-1 truncate"
+                            style={{ fontSize: 12, color: 'var(--civ-text)', fontWeight: 600 }}
+                          >
+                            {p.partido_nombre}
+                          </div>
+                          <div
+                            className="relative w-24 overflow-hidden"
+                            style={{ height: 6, borderRadius: 99, background: 'var(--civ-bg)' }}
+                          >
+                            <div
+                              style={{
+                                height: '100%',
+                                width: `${pct}%`,
+                                background: 'var(--civ-primary)',
+                                borderRadius: 99,
+                              }}
+                            />
+                          </div>
+                          <div
+                            className="w-12 text-right tabular-nums"
+                            style={{ fontSize: 11, color: 'var(--civ-text-muted)' }}
+                          >
+                            {fmtPct(pct, 1)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )
+            )}
           </div>
         )}
       </div>

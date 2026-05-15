@@ -25,10 +25,11 @@ export function FilterFields({ layout = 'horizontal' }: FilterFieldsProps) {
   const showResultsFilters = modulo === 'resultados';
   const isPresidencial = corporacion === 'P01' || corporacion === 'P02';
   // Tab-based visibility:
-  //   mapa       → Partido + Candidato + Buscar (per módulo applicability)
-  //   comparador → solo Partido (filtra ambos lados de la comparación)
-  //   dashboard  → ningún filtro de partido/candidato/buscar
-  //   reportes   → ningún filtro de partido/candidato/buscar
+  //   mapa       → Tipo + Partido + Candidato + Buscar (per módulo applicability)
+  //   comparador → ningún filtro global (Tipo se controla en cada lado de la comparación)
+  //   dashboard  → solo Tipo
+  //   reportes   → solo Tipo
+  const showTipo = activeTab !== 'comparador';
   const partidoAllowedByTab = activeTab === 'mapa' || activeTab === 'comparador';
   const candidatoAllowedByTab = activeTab === 'mapa';
   const showPartido = showResultsFilters && !isPresidencial && partidoAllowedByTab;
@@ -39,14 +40,22 @@ export function FilterFields({ layout = 'horizontal' }: FilterFieldsProps) {
 
   const stacked = layout === 'stacked';
 
-  // Tipo (1.4) · [Partido 1.2] · [Candidato 1.4] · [Search 2] · [Personal auto]
+  // [Tipo 1.4] · [Partido 1.2] · [Candidato 1.4] · [Search 2] · [Personal auto]
   const cols: string[] = [];
-  cols.push('1.4fr'); // Tipo
-  if (showPartido) cols.push('1.2fr'); // Partido
-  if (showCandidato) cols.push('1.4fr'); // Candidato
-  if (showBuscar) cols.push('2fr'); // Buscar
-  if (showJuradosManage) cols.push('auto'); // Personal
-  const gridTemplate = stacked ? '1fr' : cols.join(' ');
+  if (showTipo) cols.push('1.4fr');
+  if (showPartido) cols.push('1.2fr');
+  if (showCandidato) cols.push('1.4fr');
+  if (showBuscar) cols.push('2fr');
+  if (showJuradosManage) cols.push('auto');
+
+  if (cols.length === 0) return null;
+
+  // Cuando solo hay un campo (típicamente Tipo en Dashboard / Reportes), no
+  // queremos que el dropdown ocupe todo el ancho. Le ponemos un cap razonable.
+  let gridTemplate: string;
+  if (stacked) gridTemplate = '1fr';
+  else if (cols.length === 1) gridTemplate = 'minmax(260px, 28%)';
+  else gridTemplate = cols.join(' ');
 
   return (
     <div
@@ -57,10 +66,12 @@ export function FilterFields({ layout = 'horizontal' }: FilterFieldsProps) {
         alignItems: 'end',
       }}
     >
-      <div className="min-w-0">
-        <label style={FIELD_LABEL}>Tipo de Elección</label>
-        <TipoEleccionSelect />
-      </div>
+      {showTipo && (
+        <div className="min-w-0">
+          <label style={FIELD_LABEL}>Tipo de Elección</label>
+          <TipoEleccionSelect />
+        </div>
+      )}
 
       {showPartido && (
         <div className="min-w-0">
@@ -119,6 +130,15 @@ export function FilterFields({ layout = 'horizontal' }: FilterFieldsProps) {
 
 /** Desktop / tablet filter bar (hidden on mobile). */
 export function FilterBar() {
+  const { modulo, corporacion, activeTab } = useUIFiltersStore();
+  const isPresidencial = corporacion === 'P01' || corporacion === 'P02';
+  const showTipo = activeTab !== 'comparador';
+  const showPartido = modulo === 'resultados' && !isPresidencial && (activeTab === 'mapa' || activeTab === 'comparador');
+  const showCandidato = modulo === 'resultados' && activeTab === 'mapa';
+  const showBuscar = activeTab === 'mapa';
+  const showJuradosManage = modulo === 'jurados-testigos';
+  const hasAnyField = showTipo || showPartido || showCandidato || showBuscar || showJuradosManage;
+  if (!hasAnyField) return null;
   return (
     <div
       className="civ-card hidden shrink-0 sm:block"
