@@ -1072,19 +1072,28 @@ def _aggregate_partidos_by_name(
     """
     groups: dict[str, dict] = {}
     for row in rows:
-        key = _normalize_partido_name(row.partido_nombre)
-        if not key:
-            continue
         try:
             top5 = _json.loads(row.top5_candidatos or "[]")
         except Exception:
             top5 = []
 
+        # partido_nombre can be empty for some elections (e.g. Presidencial 2018).
+        # In those cases fall back to the top candidate's name, then to partido_codigo.
+        raw_nombre = (row.partido_nombre or "").strip()
+        if not raw_nombre and top5:
+            raw_nombre = (top5[0].get("nombre") or "").strip()
+        if not raw_nombre:
+            raw_nombre = str(row.partido_codigo or "").strip()
+
+        key = _normalize_partido_name(raw_nombre)
+        if not key:
+            continue
+
         g = groups.get(key)
         if g is None:
             g = {
                 "votos": 0,
-                "nombre": row.partido_nombre,
+                "nombre": raw_nombre,
                 "_max_row_votos": -1,
                 "codigos_originales": [],
                 "candidatos": {},  # codigo_candidato -> {codigo, nombre, votos}
@@ -1095,11 +1104,10 @@ def _aggregate_partidos_by_name(
         g["votos"] += votos
         if row.partido_codigo not in g["codigos_originales"]:
             g["codigos_originales"].append(row.partido_codigo)
-        # Nombre "preferido": el del row con más votos individuales (preserva el casing
-        # más representativo cuando hay variaciones menores entre listas).
+        # Nombre "preferido": el del row con más votos individuales.
         if votos > g["_max_row_votos"]:
             g["_max_row_votos"] = votos
-            g["nombre"] = row.partido_nombre
+            g["nombre"] = raw_nombre
 
         for cand in top5:
             cod = cand.get("codigo", "") or ""

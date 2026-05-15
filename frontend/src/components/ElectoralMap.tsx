@@ -1301,6 +1301,21 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
           />
         )}
 
+      {isConsuladosDepartmentView && departamentosGeoJSON && (
+        <GeoJSON
+          key="colombia-consulados-bg"
+          data={departamentosGeoJSON}
+          interactive={false}
+          style={() => ({
+            color: '#94a3b8',
+            weight: 1,
+            opacity: 0.5,
+            fillColor: '#dde6f0',
+            fillOpacity: 0.4,
+          })}
+        />
+      )}
+
       {currentJurisdiccion?.layer === "departamentos" &&
         municipiosGeoJSON && (
           <GeoJSON
@@ -1343,11 +1358,34 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
     </MapContainer>
   );
 
+  const totalPuestosConsulados = consuladoMunicipios.reduce((s, m) => s + m.puestosCount, 0);
+
   return (
     <div className="relative h-full w-full bg-white">
       {consuladosControl}
       {loadingPill}
       {mapContainer}
+
+      {isConsuladosDepartmentView && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[500] flex justify-center pb-10">
+          <div
+            className="rounded-xl border bg-white/90 px-6 py-4 text-center shadow-md backdrop-blur-sm"
+            style={{ borderColor: 'var(--civ-border)', maxWidth: 340 }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--civ-text)', marginBottom: 3 }}>
+              Zona Especial · Consulados
+            </div>
+            {!consuladoMunicipiosLoading && consuladoMunicipios.length > 0 && (
+              <div style={{ fontSize: 12, color: 'var(--civ-text-muted)', marginBottom: 5 }}>
+                {consuladoMunicipios.length} países · {totalPuestosConsulados.toLocaleString('es-CO')} puestos en el exterior
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: 'var(--civ-text-muted)' }}>
+              Seleccione un país en el panel izquierdo para ver sus puestos electorales
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
