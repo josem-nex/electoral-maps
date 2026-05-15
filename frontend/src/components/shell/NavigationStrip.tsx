@@ -24,7 +24,25 @@ export function NavigationStrip() {
   };
 
   const handleBack = () => {
-    navigate(-1);
+    // "Atrás" = go up one level in the territorial hierarchy, not pop browser history.
+    // Sibling-municipality clicks stack history entries, so navigate(-1) would pop
+    // to a sibling instead of the parent department.
+    const base =
+      modulo === 'resultados' ? `/resultados/${anio}` :
+      modulo === 'puestos' ? '/puestos' :
+      '/jurados-testigos';
+    const zone = navigationStack.find((j) => j.layer === 'zonas');
+    const dept = navigationStack.find((j) => j.layer === 'departamentos');
+
+    let target = base;
+    if (selectedMunicipioCode && dept && zone) {
+      target = `${base}/${zone.code}/${dept.code}`;
+    } else if (dept && zone) {
+      target = `${base}/${zone.code}`;
+    } else if (zone) {
+      target = base;
+    }
+    navigate(target + location.search);
   };
 
   return (

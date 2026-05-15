@@ -101,6 +101,23 @@ export function useRouteSync() {
       return;
     }
 
+    // Same dept, different muni (URL changed via back/forward between siblings).
+    // Don't reset() — just swap the selected muni so the map stays inside the dept.
+    if (isAtThisDept && muniCode && selectedMunicipioCode !== muniCode) {
+      setSelectedMunicipioCode(muniCode, null);
+      let cancelled = false;
+      api.getJurisdicciones('municipio', deptoCode!).then((munis) => {
+        if (cancelled) return;
+        const muni = munis.find((m) => m.code === muniCode);
+        if (muni) {
+          setSelectedMunicipioCode(muniCode, muni.name);
+        } else {
+          navigate(`${viewPath}/${zoneCode}/${deptoCode}`, { replace: true });
+        }
+      }).catch(() => { /* keep optimistic value */ });
+      return () => { cancelled = true; };
+    }
+
     // Reconstruct state from URL
     let cancelled = false;
 
