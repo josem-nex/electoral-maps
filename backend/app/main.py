@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import defaultdict
 from difflib import SequenceMatcher
-from typing import Any, List, Optional
+from typing import Any, Iterable, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -985,6 +986,10 @@ class ResultadosPartidoSchema(BaseModel):
     partido_votos: int
     pct_partido: float
     top5_candidatos: List[ResultadosCandidatoSchema]
+    # Códigos legales originales del Registraduría que se agruparon bajo este partido.
+    # Para Cámara una colectividad inscribe una lista por departamento, cada una con
+    # su propio código; al agrupar por nombre exacto exponemos los códigos para auditoría.
+    codigos_originales: Optional[List[str]] = None
 
 
 class ResultadosElectoralesResponse(BaseModel):
@@ -1027,6 +1032,97 @@ _NIVEL_NOMBRE_FIELD = {
 }
 
 
+def _normalize_partido_name(name: str) -> str:
+    """Clave estable para agrupar partidos por nombre.
+
+    Aplica trim + uppercase + strip de acentos + colapso de espacios internos.
+    NO parte por guiones ni elimina prefijos: el nombre completo es la unidad
+    mínima de agrupación, así "PACTO HISTÓRICO" y "PACTO HISTÓRICO - ALIANZA VERDE"
+    son dos entradas distintas (coaliciones se consideran entidades separadas con
+    sus propios votos).
+    """
+    if not name:
+        return ""
+    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
+    return " ".join(s.upper().split())
+
+
+def _aggregate_partidos_by_name(
+    rows: Iterable[Any],
+    votos_validos: int,
+) -> List[ResultadosPartidoSchema]:
+    """Agrupa filas ORM con el mismo partido_nombre exacto (normalizado).
+
+    Suma votos a través de los distintos partido_codigo, mergea top5_candidatos
+    por código de candidato, y produce un único `ResultadosPartidoSchema` por
+    grupo. El `partido_codigo` resultante es el nombre normalizado — clave estable
+    a través de todos los niveles territoriales para que el filtro `?part=` funcione
+    en drill-down. La lista de códigos legales originales queda en `codigos_originales`.
+
+    Para corporaciones donde cada partido ya tiene un único código (Senado,
+    Presidencial, etc.) la operación es no-op semánticamente: 1 fila → 1 grupo.
+    """
+    groups: dict[str, dict] = {}
+    for row in rows:
+        key = _normalize_partido_name(row.partido_nombre)
+        if not key:
+            continue
+        try:
+            top5 = _json.loads(row.top5_candidatos or "[]")
+        except Exception:
+            top5 = []
+
+        g = groups.get(key)
+        if g is None:
+            g = {
+                "votos": 0,
+                "nombre": row.partido_nombre,
+                "_max_row_votos": -1,
+                "codigos_originales": [],
+                "candidatos": {},  # codigo_candidato -> {codigo, nombre, votos}
+            }
+            groups[key] = g
+
+        votos = row.partido_votos or 0
+        g["votos"] += votos
+        if row.partido_codigo not in g["codigos_originales"]:
+            g["codigos_originales"].append(row.partido_codigo)
+        # Nombre "preferido": el del row con más votos individuales (preserva el casing
+        # más representativo cuando hay variaciones menores entre listas).
+        if votos > g["_max_row_votos"]:
+            g["_max_row_votos"] = votos
+            g["nombre"] = row.partido_nombre
+
+        for cand in top5:
+            cod = cand.get("codigo", "") or ""
+            if not cod:
+                continue
+            existing = g["candidatos"].get(cod)
+            if existing is None:
+                g["candidatos"][cod] = {
+                    "codigo": cod,
+                    "nombre": cand.get("nombre", ""),
+                    "votos": int(cand.get("votos", 0) or 0),
+                }
+            else:
+                existing["votos"] += int(cand.get("votos", 0) or 0)
+
+    out: List[ResultadosPartidoSchema] = []
+    for key, g in groups.items():
+        merged_top5 = sorted(g["candidatos"].values(), key=lambda c: -c["votos"])[:5]
+        pct = round(g["votos"] / votos_validos * 100, 1) if votos_validos > 0 else 0.0
+        out.append(ResultadosPartidoSchema(
+            partido_codigo=key,
+            partido_nombre=g["nombre"],
+            partido_votos=g["votos"],
+            pct_partido=pct,
+            top5_candidatos=[ResultadosCandidatoSchema(**c) for c in merged_top5],
+            codigos_originales=sorted(g["codigos_originales"]),
+        ))
+    out.sort(key=lambda p: p.partido_votos, reverse=True)
+    return out
+
+
 def _build_resultados_response(
     rows: list,
     anio: int,
@@ -1039,20 +1135,7 @@ def _build_resultados_response(
     first = rows[0]
     votos_validos = first.votos_validos
 
-    partidos: List[ResultadosPartidoSchema] = []
-    for row in rows:
-        try:
-            candidatos_raw = _json.loads(row.top5_candidatos or "[]")
-        except Exception:
-            candidatos_raw = []
-        pct = round(row.partido_votos / votos_validos * 100, 1) if votos_validos > 0 else 0.0
-        partidos.append(ResultadosPartidoSchema(
-            partido_codigo=row.partido_codigo,
-            partido_nombre=row.partido_nombre,
-            partido_votos=row.partido_votos,
-            pct_partido=pct,
-            top5_candidatos=[ResultadosCandidatoSchema(**c) for c in candidatos_raw],
-        ))
+    partidos = _aggregate_partidos_by_name(rows, votos_validos)
 
     return ResultadosElectoralesResponse(
         anio=anio,
@@ -1096,38 +1179,11 @@ def _aggregate_zona(
             votos_blancos += r.votos_blancos
             corp_nombre = r.corporacion_nombre
 
-    # Aggregate partido votos and merge candidates
-    partido_votos: dict[str, int] = defaultdict(int)
-    partido_nombre_map: dict[str, str] = {}
-    candidatos_by_partido: dict[str, dict[str, dict]] = defaultdict(dict)
-
-    for dep_rows in dep_rows_by_dep.values():
-        for row in dep_rows:
-            par = row.partido_codigo
-            partido_votos[par] += row.partido_votos
-            partido_nombre_map[par] = row.partido_nombre
-            try:
-                top5 = _json.loads(row.top5_candidatos or "[]")
-            except Exception:
-                top5 = []
-            for cand in top5:
-                cod = cand.get("codigo", "")
-                if cod not in candidatos_by_partido[par]:
-                    candidatos_by_partido[par][cod] = {"codigo": cod, "nombre": cand.get("nombre", ""), "votos": 0}
-                candidatos_by_partido[par][cod]["votos"] += cand.get("votos", 0)
-
-    # Build sorted partido list
-    partidos: List[ResultadosPartidoSchema] = []
-    for par_codigo, par_votos in sorted(partido_votos.items(), key=lambda x: -x[1]):
-        top5_merged = sorted(candidatos_by_partido[par_codigo].values(), key=lambda c: -c["votos"])[:5]
-        pct = round(par_votos / votos_validos * 100, 1) if votos_validos > 0 else 0.0
-        partidos.append(ResultadosPartidoSchema(
-            partido_codigo=par_codigo,
-            partido_nombre=partido_nombre_map[par_codigo],
-            partido_votos=par_votos,
-            pct_partido=pct,
-            top5_candidatos=[ResultadosCandidatoSchema(**c) for c in top5_merged],
-        ))
+    # Agrupa filas departamentales por nombre normalizado de partido (cubre el caso
+    # Cámara donde la misma colectividad tiene un partido_codigo distinto por
+    # departamento). Para corporaciones con código nacional único, es no-op.
+    all_rows = [row for dep_rows in dep_rows_by_dep.values() for row in dep_rows]
+    partidos = _aggregate_partidos_by_name(all_rows, votos_validos)
 
     return ResultadosElectoralesResponse(
         anio=anio,
