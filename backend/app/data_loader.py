@@ -41,6 +41,61 @@ DEPARTMENT_LEGACY_CODE_OVERRIDES = {
     "88": "56",
 }
 
+# Aliases topojson DANE → municipio del proyecto cuando el nombre difiere
+# (acentos, paréntesis, prefijo "EL/SAN/SANTA", renombramientos por la Registraduría).
+# Clave: (dept_codigo_proyecto, nombre_topojson_NORMALIZADO_sin_acentos_uppercase).
+# Valor: codigo del municipio en territorio_municipio (proyecto).
+# Cubre 19 munis donde el matching automático por nombre fallaba.
+# Casos no cubiertos (munis nuevos creados por escisión que no están en el catálogo
+# electoral del proyecto): MAPIRIPANA (50), PAPUNAHUA (68), EL CARMEN DE ATRATO (17),
+# EL CARMEN DE CHUCURI (27).
+MUNICIPIO_NAME_OVERRIDES: dict[tuple[str, str], str] = {
+    # Antioquia (proyecto dept 01, DANE 05)
+    ("01", "CIUDAD BOLIVAR"): "01058",        # → BOLIVAR
+    ("01", "SANTA FE DE ANTIOQUIA"): "01031", # → ANTIOQUIA
+    ("01", "YONDO"): "01300",                 # → YONDO-CASABE
+    ("01", "EL SANTUARIO"): "01256",          # → SANTUARIO
+    ("01", "DONMATIAS"): "01112",             # → DON MATIAS
+    ("01", "EL CARMEN DE VIBORAL"): "01082",  # → CARMEN DE VIBORAL
+    ("01", "SAN VICENTE FERRER"): "01244",    # → SAN VICENTE
+    ("01", "SAN PEDRO DE LOS MILAGROS"): "01235",  # → SAN PEDRO
+    ("01", "SAN ANDRES DE CUERQUIA"): "01223",     # → SAN ANDRES
+    ("01", "PUERTO NARE"): "01168",           # → PUERTO NARE-LA MAGDALENA
+    # Bolívar (proyecto 05)
+    ("05", "CARTAGENA DE INDIAS"): "05001",   # → CARTAGENA
+    ("05", "ARROYOHONDO"): "05009",           # → ARROYO HONDO
+    ("05", "RIO VIEJO"): "05065",             # → RIOVIEJO
+    # Boyacá (proyecto 07)
+    ("07", "VILLA DE LEYVA"): "07139",        # → VILLA DE LEIVA
+    ("07", "GUICAN DE LA SIERRA"): "07112",   # → GUICAN
+    # Cesar (proyecto 12)
+    ("12", "MANAURE BALCON DEL CESAR"): "12625",  # → MANAURE BALCON DEL CESAR (MANA…)
+    # Córdoba (proyecto 13)
+    ("13", "PURISIMA DE LA CONCEPCION"): "13034",  # → PURISIMA
+    # Cundinamarca (proyecto 15)
+    ("15", "VILLA DE SAN DIEGO DE UBATE"): "15304",  # → UBATE
+    # Chocó (proyecto 17)
+    ("17", "EL CANTON DEL SAN PABLO"): "17017",   # → EL CANTON DEL SAN PABLO (MAN.)
+    ("17", "UNION PANAMERICANA"): "17060",        # → UNION PANAMERICANA (LAS ANIMAS)
+    # Nariño (proyecto 23)
+    ("23", "EL TABLON DE GOMEZ"): "23043",        # → EL TABLON
+    ("23", "SAN ANDRES DE TUMACO"): "23139",      # → TUMACO
+    # Cauca (proyecto 11)
+    ("11", "PIENDAMO TUNIA"): "11061",            # → PIENDAMO (DANE: PIENDAMÓ - TUNÍA)
+    ("11", "LOPEZ DE MICAY"): "11043",            # → LOPEZ (MICAY)
+    # Tolima (proyecto 29)
+    ("29", "SAN SEBASTIAN DE MARIQUITA"): "29076",  # → MARIQUITA
+    # Sucre (proyecto 28)
+    ("28", "SAN LUIS DE SINCE"): "28260",         # → SINCE
+    ("28", "SANTIAGO DE TOLU"): "28300",          # → TOLU
+    ("28", "SAN JOSE DE TOLUVIEJO"): "28320",     # → TOLUVIEJO
+    # Meta (proyecto 52)
+    ("52", "SAN MARTIN"): "52060",                # → SAN MARTIN DE LOS LLANOS
+    ("52", "VISTAHERMOSA"): "52080",              # → VISTA HERMOSA
+    # Vaupés (proyecto 68)
+    ("68", "PACOA"): "68013",                     # → BUENOS AIRES (PACOA)
+}
+
 
 def normalize_codigo_territorial(value: Any, length: int) -> str:
     """Normalize a territorial code preserving left-zero padding."""
@@ -142,6 +197,8 @@ def canonicalize_municipio_code(
     return (
         mapping.get((dept_codigo_proyecto, name_full))
         or mapping.get((dept_codigo_proyecto, name_clean))
+        or MUNICIPIO_NAME_OVERRIDES.get((dept_codigo_proyecto, name_full))
+        or MUNICIPIO_NAME_OVERRIDES.get((dept_codigo_proyecto, name_clean))
         or fallback
     )
 
