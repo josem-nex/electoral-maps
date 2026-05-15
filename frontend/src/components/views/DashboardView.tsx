@@ -224,7 +224,7 @@ function ResultadosDashboard() {
   }, [paisRes, isPresidencial]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>
       )}
@@ -406,7 +406,7 @@ function PuestosDashboard() {
   }, []);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {error && <div className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <KpiCard icon={<IconBuilding />} label="Puestos electorales" value={stats ? fmt(stats.puestos_count) : (loading ? '…' : '—')} />
@@ -440,7 +440,7 @@ function JuradosDashboard() {
   }, []);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {error && <div className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <KpiCard icon={<IconUsers />} label="Jurados registrados" value={estado ? fmt(estado.jurados) : (loading ? '…' : '—')} />

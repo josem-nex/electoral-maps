@@ -10,8 +10,8 @@ export function Topbar() {
         <div
           className="grid shrink-0 place-items-center overflow-hidden"
           style={{
-            width: 110,
-            height: 72,
+            width: 88,
+            height: 58,
             borderRadius: 12,
             background: '#0c1a23',
             padding: '4px 6px',

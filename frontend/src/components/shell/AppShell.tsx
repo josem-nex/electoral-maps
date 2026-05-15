@@ -17,7 +17,7 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div
       className="flex w-full flex-col px-3 py-3 sm:px-4 sm:py-4 lg:px-6"
-      style={{ background: 'var(--civ-bg)', gap: 16, minHeight: '100vh' }}
+      style={{ background: 'var(--civ-bg)', gap: 8, minHeight: '100vh' }}
     >
       <Topbar />
       <Tabs />
