@@ -1,17 +1,19 @@
 import companyLogo from '../../../../data/images/logo.png';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 export function Topbar() {
+  const isMobile = useIsMobile();
   return (
     <header
       className="civ-card flex shrink-0 items-center justify-between"
-      style={{ padding: '18px 22px', gap: 24 }}
+      style={{ padding: isMobile ? '12px 14px' : '18px 22px', gap: isMobile ? 12 : 24 }}
     >
-      <div className="flex items-center gap-4 min-w-0">
+      <div className="flex items-center min-w-0" style={{ gap: isMobile ? 10 : 16 }}>
         <div
           className="grid shrink-0 place-items-center overflow-hidden"
           style={{
-            width: 88,
-            height: 58,
+            width: isMobile ? 60 : 88,
+            height: isMobile ? 40 : 58,
             borderRadius: 12,
             background: '#0c1a23',
             padding: '4px 6px',
@@ -27,7 +29,7 @@ export function Topbar() {
         <div className="min-w-0">
           <div
             className="flex items-center gap-2 truncate"
-            style={{ fontWeight: 700, fontSize: 19, letterSpacing: '-0.01em', color: 'var(--civ-text)' }}
+            style={{ fontWeight: 700, fontSize: isMobile ? 17 : 19, letterSpacing: '-0.01em', color: 'var(--civ-text)' }}
           >
             <span className="truncate">Resultados Electorales</span>
             <span

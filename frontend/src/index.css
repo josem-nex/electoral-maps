@@ -98,3 +98,9 @@ body.search-active .leaflet-tooltip,
 body.search-active .leaflet-popup {
   display: none !important;
 }
+
+/* Mobile typography bumps — tokens globales que no aceptan responsive prefix */
+@media (max-width: 639px) {
+  .civ-eyebrow { font-size: 11px; }
+  .civ-card-title { font-size: 16px; }
+}

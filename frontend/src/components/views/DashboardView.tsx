@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { api } from '../../api/client';
 import type { ResultadosElectorales, TerritorioStats, PersonalEstado } from '../../api/client';
 import { useUIFiltersStore } from '../../stores/uiFiltersStore';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 const fmt = (n: number) => n.toLocaleString('es-CO');
 const fmtPct = (n: number, d = 1) => `${n.toFixed(d)}%`;
@@ -20,13 +21,15 @@ interface KpiCardProps {
   icon: JSX.Element;
 }
 function KpiCard({ label, value, hint, icon }: KpiCardProps) {
+  const isMobile = useIsMobile();
+  const iconSize = isMobile ? 36 : 44;
   return (
-    <div className="civ-card flex items-center" style={{ padding: 16, gap: 14 }}>
+    <div className="civ-card flex items-center" style={{ padding: isMobile ? 12 : 16, gap: isMobile ? 10 : 14 }}>
       <div
         className="grid shrink-0 place-items-center"
         style={{
-          width: 44,
-          height: 44,
+          width: iconSize,
+          height: iconSize,
           borderRadius: 10,
           background: 'var(--civ-primary-soft)',
           color: 'var(--civ-primary)',
@@ -35,14 +38,14 @@ function KpiCard({ label, value, hint, icon }: KpiCardProps) {
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <div style={{ fontSize: 12, color: 'var(--civ-text-muted)', fontWeight: 500 }}>{label}</div>
+        <div style={{ fontSize: isMobile ? 11 : 12, color: 'var(--civ-text-muted)', fontWeight: 500 }}>{label}</div>
         <div
           className="truncate tabular-nums"
-          style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: 'var(--civ-text)' }}
+          style={{ fontSize: isMobile ? 20 : 24, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: 'var(--civ-text)' }}
         >
           {value}
         </div>
-        {hint && <div style={{ fontSize: 11, color: 'var(--civ-text-muted)', marginTop: 2 }}>{hint}</div>}
+        {hint && <div style={{ fontSize: isMobile ? 10 : 11, color: 'var(--civ-text-muted)', marginTop: 2 }}>{hint}</div>}
       </div>
     </div>
   );
@@ -281,6 +284,7 @@ const PARTY_COLORS = ['#1D4E89', '#D62828', '#F77F00', '#06A77D', '#7B2CBF', '#0
 
 function Top10Bars({ items }: { items: { code: string; name: string; votos: number }[] }) {
   const max = Math.max(1, ...items.map((d) => d.votos));
+  const isMobile = useIsMobile();
   return (
     <div className="flex flex-col" style={{ gap: 6 }}>
       {items.map((d, i) => {
@@ -289,19 +293,19 @@ function Top10Bars({ items }: { items: { code: string; name: string; votos: numb
           <div key={d.code} className="flex items-center gap-2 text-sm">
             <div
               className="w-6 shrink-0 text-right tabular-nums"
-              style={{ fontSize: 11, color: 'var(--civ-text-muted)', fontWeight: 600 }}
+              style={{ fontSize: isMobile ? 12 : 11, color: 'var(--civ-text-muted)', fontWeight: 600 }}
             >
               {String(i + 1).padStart(2, '0')}
             </div>
             <div
-              className="w-20 shrink-0 truncate sm:w-28 lg:w-32"
-              style={{ fontSize: 12, color: 'var(--civ-text)', fontWeight: 600 }}
+              className="w-24 shrink-0 truncate sm:w-28 lg:w-32"
+              style={{ fontSize: isMobile ? 13 : 12, color: 'var(--civ-text)', fontWeight: 600 }}
             >
               {d.name}
             </div>
             <div
               className="relative flex-1 overflow-hidden"
-              style={{ height: 8, borderRadius: 99, background: 'var(--civ-bg)' }}
+              style={{ height: isMobile ? 9 : 8, borderRadius: 99, background: 'var(--civ-bg)' }}
             >
               <div
                 style={{
@@ -313,8 +317,8 @@ function Top10Bars({ items }: { items: { code: string; name: string; votos: numb
               />
             </div>
             <div
-              className="w-16 shrink-0 text-right tabular-nums sm:w-24"
-              style={{ fontSize: 11, color: 'var(--civ-text-muted)' }}
+              className="w-20 shrink-0 text-right tabular-nums sm:w-24"
+              style={{ fontSize: isMobile ? 12 : 11, color: 'var(--civ-text-muted)' }}
             >
               {fmt(d.votos)}
             </div>
@@ -327,7 +331,8 @@ function Top10Bars({ items }: { items: { code: string; name: string; votos: numb
 
 interface DonutSegment { id: string; nombre: string; votos: number; pct: number; color: string }
 function Donut({ segments, totalLabel }: { segments: DonutSegment[]; totalLabel: string }) {
-  const size = 220;
+  const isMobile = useIsMobile();
+  const size = isMobile ? 230 : 220;
   const r = size / 2 - 18;
   const innerR = r - 58;
   const cx = size / 2;
@@ -375,11 +380,11 @@ function Donut({ segments, totalLabel }: { segments: DonutSegment[]; totalLabel:
             <span className="h-3 w-3 shrink-0 rounded-sm" style={{ background: d.color }} />
             <span
               className="min-w-0 flex-1 truncate"
-              style={{ fontSize: 12, color: 'var(--civ-text)' }}
+              style={{ fontSize: isMobile ? 13 : 12, color: 'var(--civ-text)' }}
             >
               {d.nombre}
             </span>
-            <span className="shrink-0 tabular-nums" style={{ fontSize: 11, color: 'var(--civ-text-muted)' }}>
+            <span className="shrink-0 tabular-nums" style={{ fontSize: isMobile ? 12 : 11, color: 'var(--civ-text-muted)' }}>
               {fmtPct(d.pct, 2)}
             </span>
           </li>

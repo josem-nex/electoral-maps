@@ -24,6 +24,7 @@ import {
   normalizeMunicipioCode,
 } from "../utils/territory";
 import { compactArchipelagoFeatureCollection } from "../utils/mapGeometry";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 // Fix for default marker icons in webpack
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -49,6 +50,7 @@ interface MapControllerProps {
   isConsuladosDepartmentView: boolean;
   selectedZoneId: number | null;
   zoneByDepartmentCode: Map<string, ZonaGroup>;
+  isMobile: boolean;
 }
 
 interface ZonaGroup {
@@ -93,6 +95,7 @@ function MapController({
   isConsuladosDepartmentView,
   selectedZoneId,
   zoneByDepartmentCode,
+  isMobile,
 }: MapControllerProps) {
   const map = useMap();
   const normalizedSelectedMunicipioCode = normalizeMunicipioCode(
@@ -107,6 +110,16 @@ function MapController({
     // Skip setView when a dept or municipality is selected — fitBounds handles
     // positioning in those cases, and having both animate causes conflicts.
     if (selectedMunicipioCode || selectedDepartmentCode) return;
+    if (isMobile) {
+      // En móvil el zoom fijo deja Colombia pequeña; ajustamos a los bounds reales.
+      const colombiaBounds = L.latLngBounds(
+        COLOMBIA_BOUNDS[0] as [number, number],
+        COLOMBIA_BOUNDS[1] as [number, number],
+      );
+      map.invalidateSize();
+      map.fitBounds(colombiaBounds, { padding: [4, 4], maxZoom: 7 });
+      return;
+    }
     map.setView(center, zoom);
   }, [
     center,
@@ -114,8 +127,25 @@ function MapController({
     selectedMunicipioCode,
     selectedDepartmentCode,
     isConsuladosDepartmentView,
+    isMobile,
     map,
   ]);
+
+  // Re-fit en cambios de tamaño del contenedor (rotación, drawer, etc.)
+  useEffect(() => {
+    const container = map.getContainer();
+    if (!container || typeof ResizeObserver === 'undefined') return;
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => map.invalidateSize());
+    });
+    ro.observe(container);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [map]);
 
   // Handle maxBounds based on view mode
   useEffect(() => {
@@ -156,7 +186,10 @@ function MapController({
     if (bounds.isValid()) {
       map.invalidateSize();
       map.setMaxBounds(null as any);
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: ZONE_FIT_MAX_ZOOM });
+      map.fitBounds(bounds, {
+        padding: isMobile ? [6, 6] : [50, 50],
+        maxZoom: ZONE_FIT_MAX_ZOOM,
+      });
       const colombiaBounds = L.latLngBounds(
         COLOMBIA_BOUNDS[0] as [number, number],
         COLOMBIA_BOUNDS[1] as [number, number],
@@ -189,7 +222,7 @@ function MapController({
         map.invalidateSize();
         map.setMaxBounds(null as any);
         map.fitBounds(bounds, {
-          padding: [20, 20],
+          padding: isMobile ? [8, 8] : [20, 20],
           maxZoom: DEPARTMENT_FIT_MAX_ZOOM,
         });
         // Restore generous padding once the animation settles (~350 ms).
@@ -234,7 +267,7 @@ function MapController({
         // Same border-clipping fix as for departments.
         map.setMaxBounds(null as any);
         map.fitBounds(bounds, {
-          padding: [60, 60],
+          padding: isMobile ? [10, 10] : [60, 60],
           maxZoom: MUNICIPALITY_FIT_MAX_ZOOM,
         });
         const colombiaBounds = L.latLngBounds(
@@ -257,6 +290,7 @@ interface ElectoralMapProps {
 }
 
 export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: ElectoralMapProps) {
+  const isMobile = useIsMobile();
   const {
     currentJurisdiccion,
     navigateTo,
@@ -1288,6 +1322,7 @@ export function ElectoralMap({ activeView = 'puestos', selectedYear = 2022 }: El
         isConsuladosDepartmentView={isConsuladosDepartmentView}
         selectedZoneId={selectedZoneId}
         zoneByDepartmentCode={zoneByDepartmentCode}
+        isMobile={isMobile}
       />
 
       {currentJurisdiccion &&

@@ -7,6 +7,7 @@ import type {
 } from '../../api/client';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { useUIFiltersStore } from '../../stores/uiFiltersStore';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 const fmt = (n: number) => n.toLocaleString('es-CO');
 const fmtPct = (n: number, d = 1) => `${n.toFixed(d)}%`;
@@ -53,6 +54,7 @@ export function JurisdictionPanel() {
   const { currentJurisdiccion, selectedMunicipioCode, selectedMunicipioName } = useNavigationStore();
   const { modulo, anio, corporacion, candidatoFiltro, partidoFiltro } = useUIFiltersStore();
   const isPresidencial = corporacion === 'P01' || corporacion === 'P02';
+  const isMobile = useIsMobile();
 
   const selection = useMemo(
     () => deriveSelection(currentJurisdiccion, selectedMunicipioCode, selectedMunicipioName),
@@ -223,13 +225,13 @@ export function JurisdictionPanel() {
   return (
     <aside
       className="civ-card flex flex-col overflow-y-auto"
-      style={{ padding: 16, gap: 14 }}
+      style={{ padding: 16, gap: isMobile ? 12 : 14 }}
     >
       <div>
         <div className="civ-eyebrow">{selection.layerLabel} · {selection.codigo}</div>
         <h3
           className="truncate"
-          style={{ marginTop: 4, fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--civ-text)' }}
+          style={{ marginTop: 4, fontSize: isMobile ? 19 : 18, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--civ-text)' }}
         >
           {selection.nombre}
         </h3>
@@ -241,6 +243,7 @@ export function JurisdictionPanel() {
           winner={winner}
           top5={top5}
           totals={resultados}
+          isMobile={isMobile}
           topLabel={
             filteredPartido ? `Top 5 candidatos · ${filteredPartido.partido_nombre || ''}`.trim() :
             isPresidencial ? 'Top 5 candidatos' : 'Top 5 partidos'
@@ -254,7 +257,7 @@ export function JurisdictionPanel() {
       )}
 
       {modulo === 'puestos' && (
-        <PuestosStatsSection stats={stats} loading={statsLoading} />
+        <PuestosStatsSection stats={stats} loading={statsLoading} isMobile={isMobile} />
       )}
 
       {modulo === 'jurados-testigos' && (
@@ -263,6 +266,7 @@ export function JurisdictionPanel() {
           statsLoading={statsLoading}
           personal={personal}
           personalLoading={personalLoading}
+          isMobile={isMobile}
         />
       )}
     </aside>
@@ -270,6 +274,7 @@ export function JurisdictionPanel() {
 }
 
 function EmptyPanel() {
+  const isMobile = useIsMobile();
   return (
     <aside
       className="civ-card flex flex-col items-center justify-center text-center"
@@ -287,8 +292,8 @@ function EmptyPanel() {
           <line x1="8" y1="2" x2="8" y2="18" /><line x1="16" y1="6" x2="16" y2="22" />
         </svg>
       </div>
-      <h4 style={{ fontSize: 14, fontWeight: 600, color: 'var(--civ-text)' }}>Selecciona una jurisdicción</h4>
-      <p style={{ fontSize: 12, color: 'var(--civ-text-muted)', lineHeight: 1.5, maxWidth: 240 }}>
+      <h4 style={{ fontSize: isMobile ? 16 : 14, fontWeight: 600, color: 'var(--civ-text)' }}>Selecciona una jurisdicción</h4>
+      <p style={{ fontSize: isMobile ? 14 : 12, color: 'var(--civ-text-muted)', lineHeight: 1.5, maxWidth: 260 }}>
         Haz click en una zona o departamento del mapa para ver el detalle de la jurisdicción.
       </p>
     </aside>
@@ -302,9 +307,10 @@ interface ResultadosSectionProps {
   totals: ResultadosElectorales | null;
   topLabel: string;
   winnerLabel: string;
+  isMobile: boolean;
 }
 
-function ResultadosSection({ loading, winner, top5, totals, topLabel, winnerLabel }: ResultadosSectionProps) {
+function ResultadosSection({ loading, winner, top5, totals, topLabel, winnerLabel, isMobile }: ResultadosSectionProps) {
   if (loading && !winner) {
     return <div style={{ fontSize: 13, color: 'var(--civ-text-muted)', textAlign: 'center', padding: 24 }}>Cargando resultados…</div>;
   }
@@ -327,20 +333,20 @@ function ResultadosSection({ loading, winner, top5, totals, topLabel, winnerLabe
         <div style={{ width: 4, height: '100%', minHeight: 36, borderRadius: 2, background: 'var(--civ-primary)' }} />
         <div className="min-w-0">
           <div className="civ-eyebrow">{winnerLabel}</div>
-          <div className="truncate" style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.2, color: 'var(--civ-text)' }}>
+          <div className="truncate" style={{ fontWeight: 700, fontSize: isMobile ? 15 : 14, lineHeight: 1.2, color: 'var(--civ-text)' }}>
             {winner.nombre}
           </div>
           {winner.subtitle && (
-            <div className="truncate" style={{ fontSize: 11, color: 'var(--civ-text-muted)', marginTop: 2 }}>
+            <div className="truncate" style={{ fontSize: isMobile ? 12 : 11, color: 'var(--civ-text-muted)', marginTop: 2 }}>
               {winner.subtitle}
             </div>
           )}
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--civ-primary)' }}>
+          <div style={{ fontSize: isMobile ? 23 : 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--civ-primary)' }}>
             {fmtPct(winner.pct, 1)}
           </div>
-          <div className="tabular-nums" style={{ fontSize: 10, color: 'var(--civ-text-muted)' }}>
+          <div className="tabular-nums" style={{ fontSize: isMobile ? 11 : 10, color: 'var(--civ-text-muted)' }}>
             {fmt(winner.votos)}
           </div>
         </div>
@@ -351,9 +357,9 @@ function ResultadosSection({ loading, winner, top5, totals, topLabel, winnerLabe
           className="grid grid-cols-3"
           style={{ gap: 8, padding: 12, background: 'var(--civ-bg)', borderRadius: 8 }}
         >
-          <Stat label="Válidos" value={fmt(totals.votos_validos)} />
-          <Stat label="Blancos" value={fmt(totals.votos_blancos)} />
-          <Stat label="Nulos" value={fmt(totals.votos_nulos)} />
+          <Stat label="Válidos" value={fmt(totals.votos_validos)} isMobile={isMobile} />
+          <Stat label="Blancos" value={fmt(totals.votos_blancos)} isMobile={isMobile} />
+          <Stat label="Nulos" value={fmt(totals.votos_nulos)} isMobile={isMobile} />
         </div>
       )}
 
@@ -363,19 +369,19 @@ function ResultadosSection({ loading, winner, top5, totals, topLabel, winnerLabe
           {top5.map((p) => (
             <div key={p.codigo} className="grid items-center" style={{ gridTemplateColumns: '1fr auto', gap: 8 }}>
               <div className="min-w-0">
-                <div className="truncate" style={{ fontSize: 12, color: 'var(--civ-text)', fontWeight: 600 }}>
+                <div className="truncate" style={{ fontSize: isMobile ? 13 : 12, color: 'var(--civ-text)', fontWeight: 600 }}>
                   {p.titulo}
                 </div>
                 {p.subtitulo && (
-                  <div className="truncate" style={{ fontSize: 10, color: 'var(--civ-text-muted)', marginTop: 1 }}>
+                  <div className="truncate" style={{ fontSize: isMobile ? 11 : 10, color: 'var(--civ-text-muted)', marginTop: 1 }}>
                     {p.subtitulo}
                   </div>
                 )}
-                <div className="relative overflow-hidden" style={{ height: 6, background: 'var(--civ-bg)', borderRadius: 99, marginTop: 4 }}>
+                <div className="relative overflow-hidden" style={{ height: isMobile ? 7 : 6, background: 'var(--civ-bg)', borderRadius: 99, marginTop: 4 }}>
                   <div style={{ height: '100%', width: `${Math.min(100, p.pct)}%`, background: 'var(--civ-primary)', borderRadius: 99 }} />
                 </div>
               </div>
-              <div className="tabular-nums" style={{ fontSize: 11, color: 'var(--civ-text-muted)', minWidth: 48, textAlign: 'right' }}>
+              <div className="tabular-nums" style={{ fontSize: isMobile ? 12 : 11, color: 'var(--civ-text-muted)', minWidth: 48, textAlign: 'right' }}>
                 {fmtPct(p.pct, 1)}
               </div>
             </div>
@@ -386,52 +392,53 @@ function ResultadosSection({ loading, winner, top5, totals, topLabel, winnerLabe
   );
 }
 
-function PuestosStatsSection({ stats, loading }: { stats: TerritorioStats | null; loading: boolean }) {
+function PuestosStatsSection({ stats, loading, isMobile }: { stats: TerritorioStats | null; loading: boolean; isMobile: boolean }) {
   if (loading && !stats) {
     return <div style={{ fontSize: 13, color: 'var(--civ-text-muted)', textAlign: 'center', padding: 24 }}>Cargando…</div>;
   }
   if (!stats) return null;
   return (
     <div className="grid grid-cols-2" style={{ gap: 8, padding: 12, background: 'var(--civ-bg)', borderRadius: 8 }}>
-      <Stat label="Puestos" value={fmt(stats.puestos_count)} />
-      <Stat label="Mesas" value={fmt(stats.mesas_sum)} />
-      <Stat label="Potencial" value={fmt(stats.total_sum)} />
-      <Stat label="M / H" value={`${fmt(stats.mujeres_sum)} / ${fmt(stats.hombres_sum)}`} />
+      <Stat label="Puestos" value={fmt(stats.puestos_count)} isMobile={isMobile} />
+      <Stat label="Mesas" value={fmt(stats.mesas_sum)} isMobile={isMobile} />
+      <Stat label="Potencial" value={fmt(stats.total_sum)} isMobile={isMobile} />
+      <Stat label="M / H" value={`${fmt(stats.mujeres_sum)} / ${fmt(stats.hombres_sum)}`} isMobile={isMobile} />
     </div>
   );
 }
 
 function JuradosSection({
-  stats, statsLoading, personal, personalLoading,
+  stats, statsLoading, personal, personalLoading, isMobile,
 }: {
   stats: TerritorioStats | null; statsLoading: boolean;
   personal: PersonalConteo | null; personalLoading: boolean;
+  isMobile: boolean;
 }) {
   return (
     <>
       {(personalLoading || personal) && (
         <div className="grid grid-cols-2" style={{ gap: 8, padding: 12, background: 'var(--civ-bg)', borderRadius: 8 }}>
-          <Stat label="Jurados" value={personal ? fmt(personal.jurados) : '…'} />
-          <Stat label="Testigos" value={personal ? fmt(personal.testigos) : '…'} />
+          <Stat label="Jurados" value={personal ? fmt(personal.jurados) : '…'} isMobile={isMobile} />
+          <Stat label="Testigos" value={personal ? fmt(personal.testigos) : '…'} isMobile={isMobile} />
         </div>
       )}
       {(statsLoading || stats) && (
         <div className="grid grid-cols-2" style={{ gap: 8, padding: 12, background: 'var(--civ-bg)', borderRadius: 8 }}>
-          <Stat label="Puestos" value={stats ? fmt(stats.puestos_count) : '…'} />
-          <Stat label="Mesas" value={stats ? fmt(stats.mesas_sum) : '…'} />
+          <Stat label="Puestos" value={stats ? fmt(stats.puestos_count) : '…'} isMobile={isMobile} />
+          <Stat label="Mesas" value={stats ? fmt(stats.mesas_sum) : '…'} isMobile={isMobile} />
         </div>
       )}
     </>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, isMobile }: { label: string; value: string; isMobile: boolean }) {
   return (
     <div>
-      <div className="tabular-nums" style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--civ-text)' }}>
+      <div className="tabular-nums" style={{ fontSize: isMobile ? 17 : 16, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--civ-text)' }}>
         {value}
       </div>
-      <div style={{ fontSize: 10, color: 'var(--civ-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600, marginTop: 2 }}>
+      <div style={{ fontSize: isMobile ? 11 : 10, color: 'var(--civ-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600, marginTop: 2 }}>
         {label}
       </div>
     </div>

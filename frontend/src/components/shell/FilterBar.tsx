@@ -9,8 +9,7 @@ interface FilterFieldsProps {
   layout?: 'horizontal' | 'stacked';
 }
 
-const FIELD_LABEL: React.CSSProperties = {
-  fontSize: 11,
+const FIELD_LABEL_BASE: React.CSSProperties = {
   fontWeight: 600,
   color: 'var(--civ-text-muted)',
   textTransform: 'uppercase',
@@ -18,6 +17,8 @@ const FIELD_LABEL: React.CSSProperties = {
   marginBottom: 6,
   display: 'block',
 };
+const FIELD_LABEL: React.CSSProperties = { ...FIELD_LABEL_BASE, fontSize: 11 };
+const FIELD_LABEL_STACKED: React.CSSProperties = { ...FIELD_LABEL_BASE, fontSize: 13 };
 
 /** Filter fields without the bar wrapper — reused inside the desktop bar and the mobile drawer. */
 export function FilterFields({ layout = 'horizontal' }: FilterFieldsProps) {
@@ -68,35 +69,35 @@ export function FilterFields({ layout = 'horizontal' }: FilterFieldsProps) {
     >
       {showTipo && (
         <div className="min-w-0">
-          <label style={FIELD_LABEL}>Tipo de Elección</label>
+          <label style={stacked ? FIELD_LABEL_STACKED : FIELD_LABEL}>Tipo de Elección</label>
           <TipoEleccionSelect />
         </div>
       )}
 
       {showPartido && (
         <div className="min-w-0">
-          <label style={FIELD_LABEL}>Partido</label>
+          <label style={stacked ? FIELD_LABEL_STACKED : FIELD_LABEL}>Partido</label>
           <PartidoSelect />
         </div>
       )}
 
       {showCandidato && (
         <div className="min-w-0">
-          <label style={FIELD_LABEL}>Candidato</label>
+          <label style={stacked ? FIELD_LABEL_STACKED : FIELD_LABEL}>Candidato</label>
           <CandidatoSelect />
         </div>
       )}
 
       {showBuscar && (
         <div className="min-w-0">
-          <label style={FIELD_LABEL}>Buscar</label>
+          <label style={stacked ? FIELD_LABEL_STACKED : FIELD_LABEL}>Buscar</label>
           <SearchBar />
         </div>
       )}
 
       {showJuradosManage && (
         <div className="min-w-0">
-          <label style={FIELD_LABEL}>Personal</label>
+          <label style={stacked ? FIELD_LABEL_STACKED : FIELD_LABEL}>Personal</label>
           <button
             type="button"
             onClick={() => setJuradosOpen(true)}

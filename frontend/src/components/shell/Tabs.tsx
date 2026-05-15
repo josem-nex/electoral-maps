@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUIFiltersStore, type ActiveTab } from '../../stores/uiFiltersStore';
 import { useNavigationStore } from '../../stores/navigationStore';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 interface TabDef {
   id: ActiveTab;
@@ -60,6 +61,7 @@ export function Tabs() {
   const { modulo, anio, activeTab, setActiveTab } = useUIFiltersStore();
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useIsMobile();
 
   const tabs = ALL_TABS.filter((t) => {
     if (t.id === 'comparador' && modulo !== 'resultados') return false;
@@ -97,13 +99,13 @@ export function Tabs() {
             className="inline-flex shrink-0 items-center transition-all"
             style={{
               gap: 8,
-              padding: '8px 14px',
+              padding: isMobile ? '9px 14px' : '8px 14px',
               borderRadius: 8,
-              fontSize: 13,
+              fontSize: isMobile ? 14 : 13,
               fontWeight: 500,
               border: 0,
               cursor: 'pointer',
-              minHeight: 36,
+              minHeight: isMobile ? 40 : 36,
               background: active ? 'var(--civ-primary)' : 'transparent',
               color: active ? '#fff' : 'var(--civ-text-muted)',
               boxShadow: active ? '0 2px 6px rgba(29,78,137,0.25)' : undefined,
