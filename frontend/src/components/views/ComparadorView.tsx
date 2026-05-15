@@ -52,10 +52,9 @@ function ComparatorSide({ label, eleccion, onChange }: ComparatorSideProps) {
   const top = useMemo(() => {
     if (!data) return null;
     const sorted = data.partidos.slice().sort((a, b) => b.partido_votos - a.partido_votos);
-    const ganador = sorted[0];
-    const top5 = sorted.slice(0, 5);
+    if (sorted.length === 0) return null;
     const total = sorted.reduce((s, p) => s + p.partido_votos, 0);
-    return { ganador, top5, total };
+    return { ganador: sorted[0], top5: sorted.slice(0, 5), total };
   }, [data]);
 
   return (
@@ -107,6 +106,11 @@ function ComparatorSide({ label, eleccion, onChange }: ComparatorSideProps) {
         {loading && !data && (
           <div className="py-8 text-center" style={{ color: 'var(--civ-text-muted)', fontSize: 13 }}>
             Cargando…
+          </div>
+        )}
+        {!loading && !error && data && !top && (
+          <div className="py-8 text-center" style={{ color: 'var(--civ-text-muted)', fontSize: 13 }}>
+            Sin datos para esta elección.
           </div>
         )}
 
