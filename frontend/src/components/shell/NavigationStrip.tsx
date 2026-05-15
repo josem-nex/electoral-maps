@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useNavigationStore } from '../../stores/navigationStore';
+import { useNavigationStore, type Jurisdiccion } from '../../stores/navigationStore';
 import { useUIFiltersStore } from '../../stores/uiFiltersStore';
 
 export function NavigationStrip() {
@@ -14,26 +14,29 @@ export function NavigationStrip() {
   const hasDrillDown = navigationStack.length > 1 || !!selectedMunicipioCode;
   if (!hasDrillDown) return null;
 
-  const homePath =
+  const base =
     modulo === 'resultados' ? `/resultados/${anio}` :
     modulo === 'puestos' ? '/puestos' :
     '/jurados-testigos';
 
+  const zone = navigationStack.find((j) => j.layer === 'zonas');
+  const dept = navigationStack.find((j) => j.layer === 'departamentos');
+
+  const segmentUrl = (j: Jurisdiccion): string | null => {
+    if (j.layer === 'pais') return base;
+    if (j.layer === 'zonas') return `${base}/${j.code}`;
+    if (j.layer === 'departamentos' && zone) return `${base}/${zone.code}/${j.code}`;
+    return null;
+  };
+
   const handleHome = () => {
-    navigate(homePath + location.search);
+    navigate(base + location.search);
   };
 
   const handleBack = () => {
     // "Atrás" = go up one level in the territorial hierarchy, not pop browser history.
     // Sibling-municipality clicks stack history entries, so navigate(-1) would pop
     // to a sibling instead of the parent department.
-    const base =
-      modulo === 'resultados' ? `/resultados/${anio}` :
-      modulo === 'puestos' ? '/puestos' :
-      '/jurados-testigos';
-    const zone = navigationStack.find((j) => j.layer === 'zonas');
-    const dept = navigationStack.find((j) => j.layer === 'departamentos');
-
     let target = base;
     if (selectedMunicipioCode && dept && zone) {
       target = `${base}/${zone.code}/${dept.code}`;
@@ -43,6 +46,18 @@ export function NavigationStrip() {
       target = base;
     }
     navigate(target + location.search);
+  };
+
+  const linkButtonStyle: React.CSSProperties = {
+    background: 'transparent',
+    border: 0,
+    padding: 0,
+    margin: 0,
+    font: 'inherit',
+    color: 'inherit',
+    cursor: 'pointer',
+    textAlign: 'left',
+    textDecoration: 'none',
   };
 
   return (
@@ -56,17 +71,30 @@ export function NavigationStrip() {
       >
         {navigationStack.map((j, i) => {
           const isLast = i === navigationStack.length - 1 && !selectedMunicipioCode;
+          const url = !isLast ? segmentUrl(j) : null;
           return (
             <span key={j.id} className="flex items-center gap-1 min-w-0">
               {i > 0 && (
                 <span className="shrink-0" style={{ color: 'var(--civ-text-soft)' }}>/</span>
               )}
-              <span
-                className="truncate"
-                style={isLast ? { fontWeight: 600, color: 'var(--civ-text)' } : undefined}
-              >
-                {j.name}
-              </span>
+              {url ? (
+                <button
+                  type="button"
+                  onClick={() => navigate(url + location.search)}
+                  className="truncate hover:underline"
+                  style={linkButtonStyle}
+                  title={`Ir a ${j.name}`}
+                >
+                  {j.name}
+                </button>
+              ) : (
+                <span
+                  className="truncate"
+                  style={isLast ? { fontWeight: 600, color: 'var(--civ-text)' } : undefined}
+                >
+                  {j.name}
+                </span>
+              )}
             </span>
           );
         })}
