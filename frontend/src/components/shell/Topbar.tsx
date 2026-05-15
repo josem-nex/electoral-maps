@@ -1,21 +1,21 @@
-import companyLogo from '../../../../data/images/LOGO FINAL E DAY TECH.png';
+import companyLogo from '../../../../data/images/logo.png';
 
 export function Topbar() {
   return (
     <header
       className="civ-card flex shrink-0 items-center justify-between"
-      style={{ padding: '14px 18px', gap: 24 }}
+      style={{ padding: '18px 22px', gap: 24 }}
     >
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center gap-4 min-w-0">
         <div
           className="grid shrink-0 place-items-center overflow-hidden"
           style={{
-            width: 56,
-            height: 40,
-            borderRadius: 10,
+            width: 110,
+            height: 72,
+            borderRadius: 12,
             background: '#0c1a23',
-            padding: '4px 8px',
-            boxShadow: '0 4px 10px rgba(12,26,35,0.18)',
+            padding: '4px 6px',
+            boxShadow: '0 4px 12px rgba(12,26,35,0.22)',
           }}
         >
           <img
@@ -27,11 +27,11 @@ export function Topbar() {
         <div className="min-w-0">
           <div
             className="flex items-center gap-2 truncate"
-            style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em', color: 'var(--civ-text)' }}
+            style={{ fontWeight: 700, fontSize: 19, letterSpacing: '-0.01em', color: 'var(--civ-text)' }}
           >
             <span className="truncate">Resultados Electorales</span>
             <span
-              className="hidden h-3 w-5 shrink-0 overflow-hidden rounded-sm sm:inline-flex"
+              className="hidden h-3.5 w-6 shrink-0 overflow-hidden rounded-sm sm:inline-flex"
               aria-label="Colombia"
               title="Colombia"
             >
@@ -42,7 +42,7 @@ export function Topbar() {
           </div>
           <div
             className="hidden truncate sm:block"
-            style={{ fontSize: 12, color: 'var(--civ-text-muted)', marginTop: 2 }}
+            style={{ fontSize: 13, color: 'var(--civ-text-muted)', marginTop: 3 }}
           >
             Colombia · Visualización por departamento, municipio y puesto
           </div>
