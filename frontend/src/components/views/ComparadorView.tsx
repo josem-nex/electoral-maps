@@ -19,7 +19,7 @@ export function ComparadorView() {
   const [sideB, setSideB] = useState<EleccionOption>(initialB);
 
   return (
-    <div className="h-full w-full overflow-auto">
+    <div className="w-full">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ComparatorSide label="A" eleccion={sideA} onChange={setSideA} />
         <ComparatorSide label="B" eleccion={sideB} onChange={setSideB} />
