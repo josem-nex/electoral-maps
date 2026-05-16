@@ -35,11 +35,13 @@ export function FilterFields({ layout = 'horizontal' }: FilterFieldsProps) {
   const candidatoAllowedByTab = activeTab === 'mapa';
   const showPartido = showResultsFilters && !isPresidencial && partidoAllowedByTab;
   const showCandidato = showResultsFilters && candidatoAllowedByTab;
-  const showBuscar = activeTab === 'mapa';
+  const stacked = layout === 'stacked';
+  // En móvil (stacked) el buscador se renderiza fuera del drawer en su propia
+  // fila para evitar que el dropdown de sugerencias quede clipeado por el
+  // overflow-y-auto del drawer.
+  const showBuscar = activeTab === 'mapa' && !stacked;
   const showJuradosManage = modulo === 'jurados-testigos';
   const [juradosOpen, setJuradosOpen] = useState(false);
-
-  const stacked = layout === 'stacked';
 
   // [Tipo 1.4] · [Partido 1.2] · [Candidato 1.4] · [Search 2] · [Personal auto]
   const cols: string[] = [];

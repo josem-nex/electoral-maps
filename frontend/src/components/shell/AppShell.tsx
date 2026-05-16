@@ -6,6 +6,8 @@ import { MobileFilterDrawer } from './MobileFilterDrawer';
 import { ActiveFiltersChips } from './ActiveFiltersChips';
 import { NavigationStrip } from './NavigationStrip';
 import { Footer } from './Footer';
+import { SearchBar } from '../SearchBar';
+import { useUIFiltersStore } from '../../stores/uiFiltersStore';
 
 interface AppShellProps {
   children: ReactNode;
@@ -13,6 +15,7 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const activeTab = useUIFiltersStore((s) => s.activeTab);
 
   return (
     <div
@@ -23,6 +26,11 @@ export function AppShell({ children }: AppShellProps) {
       <Tabs />
       <FilterBar />
       <ActiveFiltersChips onOpen={() => setDrawerOpen(true)} />
+      {activeTab === 'mapa' && (
+        <div className="sm:hidden" style={{ padding: '0 4px' }}>
+          <SearchBar />
+        </div>
+      )}
       <NavigationStrip />
       <main className="flex flex-col">{children}</main>
       <Footer />
